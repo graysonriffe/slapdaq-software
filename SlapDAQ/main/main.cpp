@@ -7,6 +7,8 @@
 /*FreeRTOS includes*/
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/event_groups.h"
+#include "esp_event.h"
 
 /*SPI Includes*/
 #include "driver/spi_master.h"
@@ -14,6 +16,12 @@
 #include "driver/spi_common.h"
 #include "sdkconfig.h"
 #include "hal/spi_types.h"
+
+/*Wi-Fi Includes*/
+#include "esp_wifi.h"
+#include "esp_mac.h"
+#include "esp_netif_net_stack.h"
+#include "esp_netif.h"
 
 /*SPI Variables*/
 #define GPIO_SPI_MOSI 11
@@ -29,14 +37,29 @@ spi_device_handle_t spi_handle;
 
 
 /*Digital GPIO Variables*/
+#define GPIO_21 GPIO_NUM_21
+#define GPIO_7 GPIO_NUM_7
+#define GPIO_6 GPIO_NUM_6
+#define GPIO_5 GPIO_NUM_5
+#define GPIO_4 GPIO_NUM_4
+#define GPIO_2 GPIO_NUM_2
+#define GPIO_1 GPIO_NUM_1
+#define GPIO_42 GPIO_NUM_42
+
+#define GPIO_SEL_BITMASK ((1ULL<<GPIO_21) | (1ULL<<GPIO_7) | (1ULL<<GPIO_6) | (1ULL<<GPIO_5) | (1ULL<<GPIO_4) | (1ULL<<GPIO_2) | (1ULL<<GPIO_1) | (1ULL<GPIO_42))
+
+
+/*Wi-Fi Variables*/
+#define WIFI_CONNECTED_BIT BIT0
+#define WIFI_FAIL_BIT BIT1
 
 
 
 /*Function Declarations*/
-extern "C" void SPI_Init(void);
-extern "C" void spi_read_data(uint8_t address);
-extern "C" void spi_write_data(uint8_t address, uint8_t data);
-
+void SPI_Init(void);
+void spi_read_data(uint8_t address);
+void spi_write_data(uint8_t address, uint8_t data);
+void dig_io_config_to_input(void);
 
 
 
@@ -51,15 +74,30 @@ extern "C" void app_main(void)
         ESP_LOGI(LOG_TAG, "SPI has been initialized");
     }
 
+    vTaskDelay(100);
+
+    /*Set GPIOs to inputs*/
+    dig_io_config_to_input();
+
+    if (ret == ESP_OK)
+    {
+        ESP_LOGI(LOG_TAG, "GPIO has been initialized");
+    }
+
+
+
+
 
     
     
+
+
 
 
 }
 
 
-extern "C" void SPI_Init (void)
+void SPI_Init (void)
 {
 
     //empty struct first
@@ -142,6 +180,27 @@ extern "C" void SPI_Init (void)
 
     spi_device_handle_t spi_adc2_handle;
     ret = spi_bus_add_device(SPI2_HOST, &devconfig_adc2, &spi_adc2_handle);
+
+    ESP_ERROR_CHECK(ret);
+
+
+}
+
+
+void dig_io_config_to_input(void)
+{
+    //Pins 21, 7, 6, 5, 4, 2, 1, and 42 will be 8 digital I/O
+
+    //Configure all these pins to be inputs
+    gpio_config_t io_config = {};
+
+    io_config.pin_bit_mask = GPIO_SEL_BITMASK; //select pins to use
+    io_config.mode = GPIO_MODE_INPUT;
+    io_config.intr_type = GPIO_INTR_DISABLE;
+    io_config.pull_up_en = GPIO_PULLUP_DISABLE;  
+    io_config.pull_down_en = GPIO_PULLDOWN_ENABLE; // configure to a pull down resistor
+
+    ret = gpio_config(&io_config);
 
     ESP_ERROR_CHECK(ret);
 
