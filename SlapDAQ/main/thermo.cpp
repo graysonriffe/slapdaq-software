@@ -21,8 +21,8 @@ bool SlapDAQ_MAX31856::thermoInit(void)
     // set Type K
     setThermocoupleType(MAX31856_TCTYPE_K);
 
-    // set One-Shot conversion mode
-    setConversionMode(MAX31856_ONESHOT);
+    // set continuous conversion mode
+    setConversionMode(MAX31856_CONTINUOUS);
 
     return true;
 }
