@@ -1,4 +1,7 @@
 
+#ifndef DIG_IO_H
+#define DIG_IO_H
+
 //necessary imports
 /*GPIO Inclues*/
 #include "driver/gpio.h"
@@ -28,4 +31,6 @@ void update_dig_io_config(void);
 
 #ifdef __cplusplus
 }
+#endif
+
 #endif

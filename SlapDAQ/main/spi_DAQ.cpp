@@ -2,8 +2,11 @@
 //includes
 #include "spi_DAQ.h"
 
+spi_device_handle_t spi_thermo_handle;
+spi_device_handle_t spi_adc1_handle;
+spi_device_handle_t spi_adc2_handle;
 
-void SPI_Init(void)
+esp_err_t SPI_Init(void)
 {
     //empty struct first
     spi_bus_config_t busconfig = {};
@@ -37,7 +40,6 @@ void SPI_Init(void)
     devconfig_thermo.queue_size = 3; // how many transactions can be queued before time out ; relevant for asynchronous, may revisit in the future
 
     //Add device to the bus
-    spi_device_handle_t spi_thermo_handle;
     SPI_ret = spi_bus_add_device(SPI2_HOST, &devconfig_thermo, &spi_thermo_handle);
 
     ESP_ERROR_CHECK(SPI_ret);
@@ -60,7 +62,6 @@ void SPI_Init(void)
     devconfig_adc1.queue_size = 3;  //double check this value
 
     //Add device to the bus
-    spi_device_handle_t spi_adc1_handle;
     SPI_ret = spi_bus_add_device(SPI2_HOST, &devconfig_adc1, &spi_adc1_handle);
 
     ESP_ERROR_CHECK(SPI_ret);
@@ -83,7 +84,6 @@ void SPI_Init(void)
     devconfig_adc2.queue_size = 3;  //double check this value
 
     //Add device to the bus
-    spi_device_handle_t spi_adc2_handle;
     SPI_ret = spi_bus_add_device(SPI2_HOST, &devconfig_adc2, &spi_adc2_handle);
 
     ESP_ERROR_CHECK(SPI_ret);
@@ -98,3 +98,5 @@ esp_err_t spi_transfer(spi_device_handle_t dev, const uint8_t *tx_data, uint8_t 
     transaction.rx_buffer = rx_data;
     return spi_device_transmit(dev, &transaction);
 }
+
+

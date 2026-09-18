@@ -22,6 +22,9 @@
 /*C Standard I/O*/
 #include <stdio.h>
 
+/*Thermocouple header*/
+#include "thermo.h"
+
 
 
 /*Global Variables*/
@@ -31,8 +34,9 @@ esp_err_t main_ret;
 extern "C" void app_main(void)
 {
 
+
     /*Initialize SPI*/
-    SPI_Init();
+    main_ret = SPI_Init();
 
     if (main_ret == ESP_OK)
     {
@@ -55,6 +59,9 @@ extern "C" void app_main(void)
     //Initialize wifi
     //wifi_initialize();
 
+
+    /*Thermocouple instantiation*/
+    SlapDAQ_MAX31856 thermo(GPIO_CS_THERMO);
 
 
 }

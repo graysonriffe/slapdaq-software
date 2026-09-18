@@ -1,4 +1,7 @@
 
+#ifndef WIFI_H
+#define WIFI_H
+
 //Necessary imports
 #include <iostream>
 
@@ -6,7 +9,7 @@
 #include "esp_log.h"
 #include "nvs_flash.h"
 #include "esp_wifi.h"
-#include "esp_mac.h"
+//#include "esp_mac.h"
 #include "esp_netif.h"
 #include "lwip/sockets.h"
 
@@ -31,4 +34,6 @@ void wifi_initialize(void);
 
 #ifdef __cplusplus
 }
+#endif
+
 #endif

@@ -1,4 +1,4 @@
-idf_component_register(SRCS "main.cpp" "dig_IO.cpp" "spi_DAQ.cpp" "wifi.cpp"
+idf_component_register(SRCS "thermo.cpp" "main.cpp" "dig_IO.cpp" "spi_DAQ.cpp" "wifi.cpp"
                     INCLUDE_DIRS "."
                     REQUIRES freertos esp_common
                     REQUIRES esp_driver_spi

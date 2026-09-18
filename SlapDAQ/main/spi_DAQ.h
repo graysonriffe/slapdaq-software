@@ -1,4 +1,7 @@
 
+#ifndef SPI_DAQ_H
+#define SPI_DAQ_H
+
 //Necessary Imports
 /*SPI Includes*/
 #include "driver/spi_master.h"
@@ -28,10 +31,12 @@ extern spi_device_handle_t spi_adc2_handle;
 
 
 /*Function Declaration*/
-void SPI_Init(void);
+esp_err_t SPI_Init(void);
 esp_err_t spi_transfer(spi_device_handle_t dev, const uint8_t *tx_data, uint8_t *rx_data, size_t len_bytes);
-void thermo_read();
+
 
 #ifdef __cplusplus
 }
+#endif
+
 #endif
