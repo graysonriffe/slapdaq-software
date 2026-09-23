@@ -27,10 +27,8 @@ bool SlapDAQ_MAX31856::thermoInit(void)
     return true;
 }
 
-SlapDAQ_MAX31856::SlapDAQ_MAX31856(int8_t csPin)
-{
-    _csPin = csPin;
-}
+// don't need this, find a way to get rid of it.
+SlapDAQ_MAX31856::SlapDAQ_MAX31856() {}
 
 /*Function to set conversion mode*/
 void SlapDAQ_MAX31856::setConversionMode(max31856_conversion_mode_t mode)

@@ -61,7 +61,7 @@ extern "C" void app_main(void)
 
 
     /*Thermocouple instantiation*/
-    SlapDAQ_MAX31856 thermo(GPIO_CS_THERMO);
+    SlapDAQ_MAX31856 thermo;
 
     //initialize thermocouple
     thermo.thermoInit();

@@ -57,7 +57,7 @@ esp_err_t SPI_Init(void)
 
     //configure device settings
     devconfig_adc1.clock_speed_hz = 10000000;
-    devconfig_adc1.mode = 0;
+    devconfig_adc1.mode = 1;                    // required to interact with adc
     devconfig_adc1.spics_io_num = GPIO_CS_ADC1;
     devconfig_adc1.queue_size = 3;  //double check this value
 
@@ -67,26 +67,6 @@ esp_err_t SPI_Init(void)
     ESP_ERROR_CHECK(SPI_ret);
 
 
-
-    /*
-    -------------------------------------------------------------------------------
-    Configuring ADC2 SPI 
-    -------------------------------------------------------------------------------
-    */
-
-    //empty device struct first
-    spi_device_interface_config_t devconfig_adc2 = {};
-
-    //configure device settings
-    devconfig_adc2.clock_speed_hz = 10000000;
-    devconfig_adc2.mode = 0;
-    devconfig_adc2.spics_io_num = GPIO_CS_ADC2;
-    devconfig_adc2.queue_size = 3;  //double check this value
-
-    //Add device to the bus
-    SPI_ret = spi_bus_add_device(SPI2_HOST, &devconfig_adc2, &spi_adc2_handle);
-
-    ESP_ERROR_CHECK(SPI_ret);
 
 }
 

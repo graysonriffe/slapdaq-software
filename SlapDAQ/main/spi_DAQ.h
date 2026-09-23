@@ -13,9 +13,8 @@
 /*SPI Variables*/
 #define GPIO_SPI_MOSI 11
 #define GPIO_SPI_MISO 13
-#define GPIO_CS_THERMO 10
-#define GPIO_CS_ADC1 8
-#define GPIO_CS_ADC2 9
+#define GPIO_CS_THERMO 8
+#define GPIO_CS_ADC1 10
 #define GPIO_SCLK 12
 
 

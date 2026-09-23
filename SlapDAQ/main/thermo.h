@@ -87,7 +87,7 @@ typedef enum
 class SlapDAQ_MAX31856
 {
     public:
-        SlapDAQ_MAX31856(int8_t csPin);
+        SlapDAQ_MAX31856(void);
 
         bool thermoInit(void);
 
