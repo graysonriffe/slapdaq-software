@@ -26,8 +26,9 @@ extern "C" {
 #endif
 
 /*Function Declaration*/
-void dig_io_config_to_input(void);
+void set_all_pins_as_input(void);
 void update_dig_io_config(void);
+
 
 #ifdef __cplusplus
 }

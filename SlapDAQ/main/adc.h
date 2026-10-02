@@ -13,6 +13,8 @@ class ADS126X
 {
     public:
         // Initialization
+        void begin(uint8_t chip_select);
+        void begin(void);
         ADS126X(void);
         SPI_Init();
         void setStartPin(uint8_t pin);      // designate pin to START
@@ -87,7 +89,7 @@ class ADS126X
         void gpioConnect(uint8_t pin);
         void gpioDisconnect(uint8_t pin);
         void gpioDirection(uint8_t pin, uint8_t direction);
-        void gpioWrite(uint8_t pin, uint9_t val);
+        void gpioWrite(uint8_t pin, uint8_t val);
         bool gpioRead(uint8_t pin);
 
 
@@ -138,7 +140,7 @@ class ADS126X
         uint8_t msb_pos(uint64_t val);      // returns the position of the most significant bit
 
 
-}
+};
 
 
 

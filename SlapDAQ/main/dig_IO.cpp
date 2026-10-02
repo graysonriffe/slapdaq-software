@@ -2,7 +2,7 @@
 //Necessary imports
 #include "dig_IO.h"
 
-void dig_io_config_to_input(void)
+void set_all_pins_as_input(void)
 {
     //Pins 21, 7, 6, 5, 4, 2, 1, and 14 will be 8 digital I/O
 
