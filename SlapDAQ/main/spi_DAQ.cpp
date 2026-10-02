@@ -66,7 +66,7 @@ esp_err_t SPI_Init(void)
 
     ESP_ERROR_CHECK(SPI_ret);
 
-
+    return ESP_FAIL;
 
 }
 
