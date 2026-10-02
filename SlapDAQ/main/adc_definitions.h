@@ -263,6 +263,7 @@ typedef union
         uint8_t CRCERR:1;               //bit: 6 CRC Error
         uint8_t LOCK:1;                 //bit: 7 Register Lock Status
     } bit;
+    uint8_t reg;
 } ADS126X_STATUS_Type;
 
 // MODE0 Register
@@ -273,6 +274,7 @@ typedef union
         uint8_t FILTER:3;               //bit: 0...2 Digital Filter
         uint8_t DR:5;                   //bit: 3...7 Data Rate
     } bit;
+    uint8_t reg;
 } ADS126X_MODE0_Type;
 
 // MODE1 Register
@@ -285,6 +287,7 @@ typedef union
         uint8_t CHOP:2;                 //bit: 5...6 Chop and AC-Excitation Modes
         uint8_t :1;                     //bit: 7     Reserved
     } bit;
+    uint8_t reg;
 } ADS126X_MODE1_Type;
 
 // MODE2 Register
@@ -295,6 +298,7 @@ typedef union
         uint8_t GPIO_DIR:4;             //bit: 0...3 GPIO Pin Direction
         uint8_t GPIO_CON:4;             //bit: 4...7 GPIO Pin Connection
     } bit;
+    uint8_t reg;
 } ADS126X_MODE2_Type;
 
 // MODE3 Register
@@ -308,6 +312,7 @@ typedef union
         uint8_t STATENB:1;              //bit: 6 STATUS Byte
         uint8_t PWDN:1;                 //bit: 7 Software Power-Down Mode
     } bit;
+    uint8_t reg;
 } ADS126X_MODE3_Type;
 
 // REF Register
@@ -320,6 +325,7 @@ typedef union
         uint8_t REFENB:1;               //bit: 4     Internal Reference Enable
         uint8_t :3;                     //bit: 5...7 Reserved
     } bit;
+    uint8_t reg;
 } ADS126X_REF_Type;
 
 // Offset Register
@@ -329,6 +335,7 @@ typedef union
     {
         uint8_t OFC:8;                  //bit: 0...7 Offset Calibration
     } bit;
+    uint8_t reg;
 } ADS126X_OFCAL_Type;
 
 // FSCAL Register
@@ -338,6 +345,7 @@ typedef union
     {
         uint8_t FSCAL:8;                //bit: 0...7 Full-Scale Calibration
     } bit;
+    uint8_t reg;
 } ADS126X_FSCAL_Type;
 
 // IMUX Register
@@ -348,6 +356,7 @@ typedef union
         uint8_t IMUX1:4;                //bit: 0...3 IDAC1 Output Multiplexer
         uint8_t IMUX2:4;                //bit: 4...7 IDAC2 Output Multiplexer
     } bit;
+    uint8_t reg;
 } ADS126X_IMUX_Type;
 
 // IMAG Register
@@ -358,6 +367,7 @@ typedef union
         uint8_t IMAG1:4;                //bit: 0...3 IDAC1 Current Magnitude
         uint8_t IMAG2:4;                //bit: 4...7 IDAC2 Current Magnitude
     } bit;
+    uint8_t reg;
 } ADS126X_IMAG_Type;
 
 // RESERVED Register
@@ -367,6 +377,7 @@ typedef union
     {
         uint8_t :8;                     //bit: 0...7 Reserved
     } bit;
+    uint8_t reg;
 } ADS126X_RESERVED_Type;
 
 // PGA Register
@@ -378,6 +389,7 @@ typedef union
         uint8_t :4;                     //bit: 3...6 Reserved
         uint8_t BYPASS:1;               //bit: 7     PGA Bypass Mode
     } bit;
+    uint8_t reg;
 } ADS126X_PGA_Type;
 
 // INPMUX Register
@@ -388,6 +400,7 @@ typedef union
         uint8_t MUXN:4;                 //bit: 0...3 Negative Input Multiplexer
         uint8_t MUXP:4;                 //bit: 4...7 Positive Input Multiplexer
     } bit;
+    uint8_t reg;
 } ADS126X_INPMUX_Type;
 
 // INPBIAS Register
@@ -400,6 +413,7 @@ typedef union
         uint8_t VBIAS:1;                //bit: 4     VBIAS
         uint8_t :3;                     //bit: 5...7 Reserved
     } bit;
+    uint8_t reg;
 } ADS126X_INPBIAS_Type;
 
 

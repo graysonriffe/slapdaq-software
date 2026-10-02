@@ -16,7 +16,6 @@ class ADS126X
         void begin(uint8_t chip_select);
         void begin(void);
         ADS126X(void);
-        SPI_Init();
         void setStartPin(uint8_t pin);      // designate pin to START
 
         // General ADC Commands
@@ -97,6 +96,10 @@ class ADS126X
         void enablePGA(void);
         void disablePGA(void);
         void setGain(uint8_t gain);
+
+        //spi functions
+        void spiWrite(uint8_t buffer[], uint8_t length);
+        void spiRead(uint8_t buffer[], uint8_t length);
 
 
         // Main Commands
