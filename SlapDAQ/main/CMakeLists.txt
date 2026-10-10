@@ -6,4 +6,5 @@ idf_component_register(SRCS "adc.cpp" "thermo.cpp" "main.cpp" "dig_IO.cpp" "spi_
                     REQUIRES esp_hal_gpspi
                     REQUIRES esp_wifi
                     REQUIRES nvs_flash
+                    esp_timer
                     )

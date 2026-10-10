@@ -34,6 +34,7 @@ extern "C" {
 #define ADS126X_MODE1             0x03
 #define ADS126X_MODE2             0x04
 #define ADS126X_MODE3             0x05
+#define ADS126X_REFMUX            0x06
 #define ADS126X_OFCAL0            0x07
 #define ADS126X_OFCAL1            0x08
 #define ADS126X_OFCAL2            0x09
@@ -49,13 +50,15 @@ extern "C" {
 
 #define ADS126X_REG_NUM           0x13 // number of registers
 
-/**************************UNCLEAR******************************/
 
 //checksum macros - not sure if we are using CRC yet
 #define ADS126X_CRCEN             0b1 // used to enable CRC
 #define ADS126X_CRCDIS            0b0
+#define ADS126X_CRC_BYTE          0b100000111
 
-/**************************UNCLEAR******************************/
+
+// ID register: DEV_ID[3:0] = 1000b for ADS1261
+#define ADS126X_DEV_ID            0b1000
 
 // Enable options that are used in most registers
 #define ADS126X_ENABLE            0b01
@@ -79,7 +82,15 @@ extern "C" {
 #define ADS126X_RESET_NO                   0b0 
 #define ADS126X_RESET_YES                  0b1
 
-//Mode0 bit options                        all in SPS aka Hz
+//Mode0 filter options options (FILTER[2:0]) - Table 32                        
+#define ADS126X_FILTER_SINC1               0b000
+#define ADS126X_FILTER_SINC2               0b001
+#define ADS126X_FILTER_SINC3               0b010
+#define ADS126X_FILTER_SINC4               0b011
+#define ADS126X_FILTER_FIR                 0b100    //reset default
+
+
+//Mode0 bit options (all in SPS aka Hz)
 #define ADS126X_DR_2_5                     0b00000
 #define ADS126X_DR_5                       0b00001
 #define ADS126X_DR_10                      0b00010
@@ -139,6 +150,10 @@ extern "C" {
 #define ADS126X_GPIO_DIR_0_OUT             0b0      //AIN2
 #define ADS126X_GPIO_DIR_0_IN              0b1
 
+// per-pin direction values for GPIO
+#define ADS126X_GPIO_OUTPUT                0
+#define ADS126X_GPIO_INPUT                 1
+
 //Mode3 bit options
 #define ADS126X_PWDN_NORM                  0b0
 #define ADS126X_PWDN_SOFT                  0b1
@@ -146,8 +161,6 @@ extern "C" {
 #define ADS126X_STATENB_STAT               0b1
 #define ADS126X_CRCENB_NO_CRC              0b0
 #define ADS126X_CRCENB_CRC                 0b1
-//#define ADS126X_SPITIM_DISABLE             0b0
-//#define ADS126X_SPITIM_ENABLE              0b1
 #define ADS126X_GPIO_DAT_3_LOW             0b0      //read
 #define ADS126X_GPIO_DAT_3_HIGH            0b1      //write
 #define ADS126X_GPIO_DAT_2_LOW             0b0
@@ -157,10 +170,7 @@ extern "C" {
 #define ADS126X_GPIO_DAT_0_LOW             0b0
 #define ADS126X_GPIO_DAT_0_HIGH            0b1
 
-/****************** */
-//ADD REFERENCE MACROS!!!!!
-//#define ADS126X_REFENB_ENABLE              0b0
-//#define ADS126X_REFENB_DISABLE             0b1
+// Reference macros
 #define ADS126X_RMUXP_INTRN_REFP           0b00
 #define ADS126X_RMUXP_INTRN_AVDD           0b01
 #define ADS126X_RMUXP_INTRN_AIN0           0b10
@@ -187,6 +197,19 @@ extern "C" {
 #define ADS126X_MUXP_DVDD_P                0b1101
 #define ADS126X_MUXP_INP_OPEN              0b1110
 #define ADS126X_MUXP_CONN_TO_VCOM          0b1111
+
+//MUXN is the same 4-bit codes at MUXP
+#define ADS126X_MUXN_AINCOM                ADS126X_MUXP_AINCOM
+#define ADS126X_MUXN_AIN0                  ADS126X_MUXP_AIN0
+#define ADS126X_MUXN_AIN1                  ADS126X_MUXP_AIN1
+#define ADS126X_MUXN_AIN2                  ADS126X_MUXP_AIN2
+#define ADS126X_MUXN_AIN3                  ADS126X_MUXP_AIN3
+#define ADS126X_MUXN_AIN4                  ADS126X_MUXP_AIN4
+#define ADS126X_MUXN_AIN5                  ADS126X_MUXP_AIN5
+#define ADS126X_MUXN_AIN6                  ADS126X_MUXP_AIN6
+#define ADS126X_MUXN_AIN7                  ADS126X_MUXP_AIN7
+#define ADS126X_MUXN_AIN8                  ADS126X_MUXP_AIN8
+#define ADS126X_MUXN_AIN9                  ADS126X_MUXP_AIN9
 
 //IDAC Output pins
 #define ADS126X_IDAC_AIN_0                     0b0000
@@ -441,6 +464,8 @@ typedef struct
     __IO ADS126X_INPBIAS_Type       INPBIAS;    // Offset: 0x12 (R/W 8) Input Bias
 } ADS126X_REGISTER_Type;
 
+// make sure above struct is 19 bytes
+static_assert(sizeof(ADS126X_REGISTER_Type) == ADS126X_REG_NUM, "register map must be 19 bytes");
 
 
 #ifdef __cplusplus
