@@ -2,8 +2,11 @@
 //necessary imports
 #include "wifi.h"
 
-void wifi_initialize(void) {
-    ESP_LOGI(TAG, "Initializing...");
+static int s_listenFD = -1;
+static int s_clientFD = -1;
+
+bool wifi_initialize(void) {
+    ESP_LOGI(WIFI_TAG, "Initializing...");
 
     //Initializing NVS
     esp_err_t nvs_ret = nvs_flash_init();
@@ -51,12 +54,13 @@ void wifi_initialize(void) {
     ESP_ERROR_CHECK(esp_wifi_start());
 
     //Create the socket for TCP communication
-    ESP_LOGI(TAG, "Creating socket...");
+    ESP_LOGI(WIFI_TAG, "Creating socket...");
 
     int socketFD = socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
     if (socketFD < 0) {
-        ESP_LOGE(TAG, "Could not create socket.");
-        return;
+        ESP_LOGE(WIFI_TAG, "Could not create socket.");
+        close(socketFD);
+        return false;
     }
 
     //Define IPv4 information for server
@@ -65,35 +69,79 @@ void wifi_initialize(void) {
     serverAddress.sin_addr.s_addr = htonl(INADDR_ANY);
     serverAddress.sin_port = htons(15000);
 
+    // quick rebinding after a reboot
+    int opt = 1;
+    setsockopt(socketFD, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
+
     //Bind for listening
     int err = bind(socketFD, (sockaddr*)&serverAddress, sizeof(serverAddress));
     if (err != 0) {
-        ESP_LOGE(TAG, "Could not bind socket!");
+        ESP_LOGE(WIFI_TAG, "Could not bind socket!");
         close(socketFD);
-        return;
+        return false;
     }
 
     err = listen(socketFD, 1);
     if (err != 0) {
-        ESP_LOGE(TAG, "Could not start listening!");
+        ESP_LOGE(WIFI_TAG, "Could not start listening!");
         close(socketFD);
-        return;
+        return false;
     }
 
-    while (true) {
-        ESP_LOGI(TAG, "Listening for TCP connections...");
+    s_listenFD = socketFD;
+    ESP_LOGI(WIFI_TAG, "Listening on port 15000");
+    return true;
 
+}
+
+bool wifi_client_connected(int timeout_ms)
+{
+    if (s_clientFD >= 0) return true;
+    if (s_listenFD < 0) return false;
+
+    fd_set readSet;
+    FD_ZERO(&readSet);
+    FD_SET(s_listenFD, &readSet);
+    timeval tv = {timeout_ms / 1000, (timeout_ms % 1000) * 1000};
+
+    int sel = select(s_listenFD + 1, &readSet, nullptr, nullptr, &tv);
+
+    if (sel < 0)
+    {
+        ESP_LOGE(WIFI_TAG, "select failed, errno=%d", errno);
+        return false;
+    }
+
+    if (sel > 0)
+    {
         sockaddr_in clientAddress = {};
-        socklen_t clientAddressLength = sizeof(clientAddress);
-        int clientSocket = accept(socketFD, (sockaddr*)&clientAddress, &clientAddressLength);
-        if (clientSocket < 0) {
-            ESP_LOGE(TAG, "Could not accept.");
-            continue;
+        socklen_t len = sizeof(clientAddress);
+        int fd = accept(s_listenFD, (sockaddr*)&clientAddress, &len);
+        
+        if (fd >= 0)
+        {
+            s_clientFD = fd;
+            ESP_LOGI(WIFI_TAG, "Got connection from %s. Sending data", inet_ntoa(clientAddress.sin_addr));
+            return true;
         }
 
-        ESP_LOGI(TAG, "Got connection. Sending data...");
-
-
-
+        if (fd < 0) ESP_LOGE(WIFI_TAG, "accept failed, errno=%d", errno);
     }
+    return false;
+    
+
+}
+
+bool wifi_send(const char *data, size_t len)
+{
+    if(s_clientFD < 0) return false;
+    if (send(s_clientFD, data, len, 0) < 0)
+    {
+        ESP_LOGW(WIFI_TAG, "Send failed, closing client");
+        close(s_clientFD);
+        s_clientFD = -1;
+        return false;
+    }
+    return true;
 }

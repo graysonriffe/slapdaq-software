@@ -28,10 +28,14 @@
 /*ADC Include*/
 #include "adc.h"
 
+/*Struct Function Includes*/
+#include "struct_send.h"
 
 
 /*Global Variables*/
 esp_err_t main_ret;
+
+
 
 // Reference voltage ADC uses in volts. Default reference = AVDD - AVSS
 static const double ADC_VREF_VOLTS = 5.0;
@@ -39,7 +43,11 @@ static const double ADC_VREF_VOLTS = 5.0;
 extern "C" void app_main(void)
 {
 
-    #if 1
+    /******************************************************** */
+    /*                INITIALIZATION                          */
+    /******************************************************** */
+
+
     /*Initialize SPI*/
     main_ret = SPI_Init();
 
@@ -49,9 +57,8 @@ extern "C" void app_main(void)
         return;
     }
     ESP_LOGI(LOG_TAG, "SPI has been initialized");
-    #endif
 
-    #if 0
+
     /*Set GPIOs to inputs*/
     set_all_pins_as_input();
 
@@ -60,27 +67,24 @@ extern "C" void app_main(void)
         ESP_LOGI(LOG_TAG, "GPIO has been initialized");
     }
 
-    gpio_dump_io_configuration(stdout, GPIO_SEL_BITMASK);
-    #endif
-    
-    #if 0
-    //Initialize wifi
-    wifi_initialize();
-    #endif
 
-    #if 0
+    //Initialize wifi
+    if (!wifi_initialize())
+    {
+        ESP_LOGE(LOG_TAG, "Wifi could not be initialized");
+        return;
+    }
+
     /*Thermocouple instantiation*/
     SlapDAQ_MAX31856 thermo;
 
     //initialize thermocouple
-    thermo.thermoInit();
-
-    //read thermocouple readings
-    while(true)
+    if (thermo.thermoInit() == true)
     {
-    thermo.readThermocoupleTemperature();
+        ESP_LOGI(LOG_TAG, "Thermocouple has been initialized!");
     }
-    #endif
+    
+
 
     ADS126X adc;
 
@@ -91,10 +95,48 @@ extern "C" void app_main(void)
         return;
     }
 
-    ESP_LOGI(LOG_TAG, "Reading Voltages: AIN0 (+) - AIN1 (-)");
+
+
+
+    /******************************************************** */
+    /*                MAIN LOOP                               */
+    /******************************************************** */
+
+
+    bool was_connected = false;
+    TickType_t lastWake = xTaskGetTickCount();
+
 
     while (true)
     {
+
+        bool connected = wifi_client_connected(0);
+
+        if (connected != was_connected)
+        {
+            ESP_LOGI(LOG_TAG, connected ? "Client connected" : "Client disconnected");
+            was_connected = connected;
+        }
+
+        // update digital IO from user
+
+
+
+
+
+        // read thermocouple data
+        float thermo_temps_to_send;
+
+        ESP_LOGI(LOG_TAG, "Reading temperatures from thermocouple!");
+
+        thermo_temps_to_send = thermo.readThermocoupleTemperature();
+        
+
+
+        //read ADC data
+
+        ESP_LOGI(LOG_TAG, "Reading Voltages: AIN0 (+) - AIN1 (-)");
+
         int32_t raw = 0;
 
         // Pass MUX CODES
@@ -111,8 +153,32 @@ extern "C" void app_main(void)
         }
 
         vTaskDelay(pdMS_TO_TICKS(1000));
+
+
+        // send measurements to host PC
+        if (connected)
+        {
+            SensorData measurements;
+            measurements.digitalIOData = digital_bits;
+            measurements.tempData = static_cast<int32_t>(lroundf(temp_c * 128.0f));
+            measurements.adcData = raw;
+            sendStructOverWifi(measurements);
+        }
+
+        vTaskDelayUntil(&lastWake, pdMS_TO_TICKS(1000));
+        
+        
+
+
+
+
+
+
+
+
+
     }
-    
+
 
 }
 

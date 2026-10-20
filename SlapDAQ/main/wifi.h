@@ -20,7 +20,7 @@
 #define WIFI_PASSWORD   "dummyPassword"
 #define WIFI_SSID  "Main SLAPDAQ"
 
-static const char* TAG = "esp-test";
+static const char* WIFI_TAG = "esp-test";
 
 
 
@@ -30,7 +30,9 @@ extern "C" {
 
 
 /*Function Declaration*/
-void wifi_initialize(void);
+bool wifi_initialize(void);
+bool wifi_client_connected(int timeout_ms);
+bool wifi_send(const char *data, size_t len);
 
 #ifdef __cplusplus
 }
