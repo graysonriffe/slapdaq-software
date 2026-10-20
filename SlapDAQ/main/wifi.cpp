@@ -145,3 +145,27 @@ bool wifi_send(const char *data, size_t len)
     }
     return true;
 }
+
+int wifi_receive(uint8_t *buf, size_t len)
+{
+    if (s_clientFD < 0) return 0;
+
+    int n = recv(s_clientFD, buf, len, MSG_DONTWAIT);
+
+    if (n > 0) return n;
+
+    if (n == 0)
+    {
+        ESP_LOGW(WIFI_TAG, "Client disconnected, closing socket");
+        close(s_clientFD);
+        s_clientFD = -1;
+        return -1;
+    }
+
+    if (errno == EAGAIN || errno == EWOULDBLOCK) return 0;
+
+    ESP_LOGW(WIFI_TAG, "Recieve failed (errno=%d, closing client", errno);
+    close(s_clientFD);
+    s_clientFD = -1;
+    return -1;
+}

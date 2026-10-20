@@ -33,6 +33,7 @@ extern "C" {
 bool wifi_initialize(void);
 bool wifi_client_connected(int timeout_ms);
 bool wifi_send(const char *data, size_t len);
+int wifi_receive(uint8_t *buf, size_t len);
 
 #ifdef __cplusplus
 }

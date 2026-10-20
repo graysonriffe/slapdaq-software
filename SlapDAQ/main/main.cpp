@@ -114,13 +114,29 @@ extern "C" void app_main(void)
 
         if (connected != was_connected)
         {
-            ESP_LOGI(LOG_TAG, connected ? "Client connected" : "Client disconnected");
+            ESP_LOGI(LOG_TAG, "Client %s", connected ? "connected" : "disconnected");
             was_connected = connected;
         }
 
         // update digital IO from user
+        uint8_t rx[2];
+        int n = connected ? wifi_receive(rx, sizeof(rx)) : 0;
 
+        if (n > 0)
+        {
+            uint8_t type, mask;
+            if (parseDioConfigPacket(rx, n, &type, &mask))
+            {
+                switch (type)
+                {
+                    case MSG_SET_DIO_DIR: applyDioDirections(mask); break;
+                    case MSG_SET_DIO_LEVEL: applyDioDirections(mask); break;
+                    default: break;
+                }
+            }
+        }
 
+        uint8_t digital_bits = read_all_pins();
 
 
 
@@ -152,7 +168,6 @@ extern "C" void app_main(void)
             ESP_LOGE(LOG_TAG, "readADC failed: %s", esp_err_to_name(main_ret));
         }
 
-        vTaskDelay(pdMS_TO_TICKS(1000));
 
 
         // send measurements to host PC
@@ -160,23 +175,14 @@ extern "C" void app_main(void)
         {
             SensorData measurements;
             measurements.digitalIOData = digital_bits;
-            measurements.tempData = static_cast<int32_t>(lroundf(temp_c * 128.0f));
+            measurements.tempData = static_cast<int32_t>(thermo_temps_to_send);
             measurements.adcData = raw;
             sendStructOverWifi(measurements);
         }
 
         vTaskDelayUntil(&lastWake, pdMS_TO_TICKS(1000));
         
-        
-
-
-
-
-
-
-
-
-
+    
     }
 
 

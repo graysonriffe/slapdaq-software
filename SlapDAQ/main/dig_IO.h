@@ -20,6 +20,16 @@
 
 #define GPIO_SEL_BITMASK ((1ULL<<GPIO_15) | (1ULL<<GPIO_7) | (1ULL<<GPIO_6) | (1ULL<<GPIO_5) | (1ULL<<GPIO_4) | (1ULL<<GPIO_16) | (1ULL<<GPIO_17) | (1ULL<<GPIO_18))
 
+/*Create a look-up table for pin-to-bit mapping*/
+static const gpio_num_t DIO_PINS[8] =
+{
+    GPIO_NUM_4, GPIO_NUM_5, GPIO_NUM_6, GPIO_NUM_7,
+    GPIO_NUM_15, GPIO_NUM_16, GPIO_NUM_17,
+    GPIO_NUM_18
+};
+constexpr uint8_t MSG_SET_DIO_DIR = 0x01;
+constexpr uint8_t MSG_SET_DIO_LEVEL = 0x02;
+
 
 #ifdef __cplusplus
 extern "C" {
@@ -27,8 +37,9 @@ extern "C" {
 
 /*Function Declaration*/
 void set_all_pins_as_input(void);
-void update_dig_io_config(void);
-
+bool parseDioConfigPacket(const uint8_t *buf, size_t len, uint8_t *type, uint8_t *dir_mask);
+esp_err_t applyDioDirections(uint8_t dir_mask);
+uint8_t read_all_pins(void);
 
 #ifdef __cplusplus
 }
