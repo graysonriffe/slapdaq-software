@@ -32,7 +32,7 @@ class ADS126X
         esp_err_t begin(void);
 
         // tie START pin to ground as its unused
-        void setStartPin(uint8_t pin);
+        esp_err_t setStartPin(uint8_t pin);
 
         // General ADC Commands
         esp_err_t noOperation(void);

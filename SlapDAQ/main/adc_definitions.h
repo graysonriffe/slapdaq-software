@@ -54,7 +54,7 @@ extern "C" {
 //checksum macros - not sure if we are using CRC yet
 #define ADS126X_CRCEN             0b1 // used to enable CRC
 #define ADS126X_CRCDIS            0b0
-#define ADS126X_CRC_BYTE          0b100000111
+//#define ADS126X_CRC_BYTE          0b100000111
 
 
 // ID register: DEV_ID[3:0] = 1000b for ADS1261
@@ -212,7 +212,7 @@ extern "C" {
 #define ADS126X_MUXN_AIN9                  ADS126X_MUXP_AIN9
 
 //IDAC Output pins
-#define ADS126X_IDAC_AIN_0                     0b0000
+#define ADS126X_IDAC_AIN0                      0b0000
 #define ADS126X_IDAC_AIN1                      0b0001
 #define ADS126X_IDAC_AIN2                      0b0010
 #define ADS126X_IDAC_AIN3                      0b0011

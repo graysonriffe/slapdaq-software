@@ -36,7 +36,7 @@ extern "C" {
 #endif
 
 /*Function Declaration*/
-void set_all_pins_as_input(void);
+esp_err_t set_all_pins_as_input(void);
 bool parseDioConfigPacket(const uint8_t *buf, size_t len, uint8_t *type, uint8_t *dir_mask);
 esp_err_t applyDioDirections(uint8_t dir_mask);
 uint8_t read_all_pins(void);

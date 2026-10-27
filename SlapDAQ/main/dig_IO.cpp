@@ -2,7 +2,7 @@
 //Necessary imports
 #include "dig_IO.h"
 
-void set_all_pins_as_input(void)
+esp_err_t set_all_pins_as_input(void)
 {
     //Pins 21, 7, 6, 5, 4, 2, 1, and 14 will be 8 digital I/O
 
@@ -15,9 +15,8 @@ void set_all_pins_as_input(void)
     io_config.pull_up_en = GPIO_PULLUP_DISABLE;
     io_config.pull_down_en = GPIO_PULLDOWN_ENABLE; //Configure to a pulldown resistor
 
-    esp_err_t ret = gpio_config(&io_config);
+    return gpio_config(&io_config);
 
-    ESP_ERROR_CHECK(ret);
 }
 
 /*
@@ -29,13 +28,13 @@ void set_all_pins_as_input(void)
 
 */
 
-bool parseDioConfigPacket(const uint8_t *buf, size_t len, uint8_t *type, uint8_t *dir_mask)
+bool parseDioConfigPacket(const uint8_t *buf, size_t len, uint8_t *type, uint8_t *mask)
 {
     if (len < 2 || buf[0] != MSG_SET_DIO_DIR)
     {
         return false;
     }
-    *dir_mask = buf[1];
+    *mask = buf[1];
     return true;
 }
 

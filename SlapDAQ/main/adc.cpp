@@ -3,6 +3,7 @@
 
 #include "esp_log.h"
 #include "esp_timer.h"
+#include "esp_rom_sys.h"
 #include "driver/gpio.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -12,8 +13,6 @@ static const char *ADC_TAG = "ADS1261";
 // return from a function that returns an esp_err_t
 #define TRY(expr) do {esp_err_t _e = (expr); if (_e != ESP_OK) return _e;} while(0)
 
-// show that REGISTER has 19 bytes
-static_assert(sizeof(ADS126X_REGISTER_Type) == ADS126X_REG_NUM, "REGISTER must be exactly 19 bytes");
 
 static void delayMs(uint32_t ms)
 {
@@ -25,11 +24,7 @@ static void delayMs(uint32_t ms)
 /****************LOW-LEVEL SPI**************/
 esp_err_t ADS126X::spiTransfer(const uint8_t *tx, uint8_t *rx, size_t len)
 {
-    spi_transaction_t t = {};
-    t.length = 8*len;
-    t.tx_buffer = tx;
-    t.rx_buffer = rx;
-    return spi_device_transmit(spi_adc1_handle, &t);
+    return spi_transfer(spi_adc1_handle, tx, rx, len);
 }
 
 // every replay starts with FFh, then echos 1 byte of a command (datasheet Tables 17-26)
@@ -38,8 +33,18 @@ esp_err_t ADS126X::checkFrame(uint8_t sent_cmd, const uint8_t *rx)
 {
     if (rx[0] != 0xFF || rx[1] != sent_cmd)
     {
-        ESP_LOGE(ADC_TAG, "Bad replay to cmd 0x%02X: got 0x%02X (want 0xFF%02X)", sent_cmd, rx[0], rx[1], sent_cmd);
-        return ESP_ERR_INVALID_RESPONSE;
+        ESP_LOGE(ADC_TAG, "Bad replay to cmd 0x%02X: got 0x%02X%02X (want 0xFF%02X)", sent_cmd, rx[0], rx[1], sent_cmd);
+        
+        // add logs for common ADC responses
+        if (rx[0] == 0x00 && rx[1] == 0x00)
+        {
+            ESP_LOGE(ADC_TAG, " MISO reads all 0s: ADC is not powered on, RESET/PWDN pin held low, or MISO shorted to GND");
+            
+        } else if (rx[0] == 0xFF && rx[1] == 0xFF)
+            {
+                ESP_LOGE(ADC_TAG, " MISO reads all 1s: MISO floating or wrong CS");
+            }
+            return ESP_ERR_INVALID_RESPONSE;
     }
     return ESP_OK;
 }
@@ -66,9 +71,11 @@ esp_err_t ADS126X::noOperation()
 
 esp_err_t ADS126X::reset(void)
 {
+    initialized_ = false;
+
     TRY(sendCommand(ADS126X_RESET));
     delayMs(5);         // restart = 512 / fCLK ~= 70us. adding more room
-    return ESP_OK;
+    return readAllRegisters();
 }
 
 esp_err_t ADS126X::startADC(void)
@@ -77,7 +84,7 @@ esp_err_t ADS126X::startADC(void)
     {
         // low -> high ege on START restarts a conversion
         gpio_set_level((gpio_num_t) start_pin, 0);
-        delayMs(1);
+        esp_rom_delay_us(5);
         gpio_set_level((gpio_num_t) start_pin, 1);
         return ESP_OK;
     }
@@ -95,12 +102,23 @@ esp_err_t ADS126X::stopADC(void)
     return sendCommand(ADS126X_STOP);
 }
 
-void ADS126X::setStartPin(uint8_t pin)
+esp_err_t ADS126X::setStartPin(uint8_t pin)
 {
+    // drive latch low before enabling the output in case pin goes high unexpectedly
+    gpio_set_level((gpio_num_t) pin, 0);
+
+    gpio_config_t cfg = {};
+    cfg.pin_bit_mask = 1ULL << pin;
+    cfg.mode = GPIO_MODE_OUTPUT;
+    cfg.pull_up_en = GPIO_PULLUP_DISABLE;
+    cfg.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    cfg.intr_type = GPIO_INTR_DISABLE;
+    TRY(gpio_config(&cfg));
+    
+    
     start_used = true;
     start_pin = pin;
-    gpio_set_direction((gpio_num_t) pin, GPIO_MODE_OUTPUT);
-    gpio_set_level((gpio_num_t) pin, 0);
+    return ESP_OK;
 }
 
 
@@ -163,11 +181,11 @@ esp_err_t ADS126X::begin(void)
     delayMs(20);
 
     //reset adc after mcu reboot just in case
+    // also checks wiring
     TRY(stopADC());
     TRY(reset());
 
-    //load shadow registers from the chip. A way to check wiring is correct
-    TRY(readAllRegisters());
+
     if (REGISTER.ID.bit.DEV_ID != ADS126X_DEV_ID)
     {
         ESP_LOGE(ADC_TAG, "Unexpected ID register 0x%02X (DEV_ID should be 0x%X). Check SPI mode 1 / MISO / CS / power.", 
@@ -191,13 +209,14 @@ esp_err_t ADS126X::begin(void)
     // read back what was wrote (datasheet recommends verifying)
     const uint8_t want_mode1 = REGISTER.MODE1.reg;
     const uint8_t want_mode3 = REGISTER.MODE3.reg;
-    uint8_t got_mode1 = 0, got_mode3 = 0;
+    uint8_t got_mode1 = 0, got_mode3 = 0, got_status = 0;
     TRY(readRegister(ADS126X_MODE1, &got_mode1));
     TRY(readRegister(ADS126X_MODE3, &got_mode3));
-    if (got_mode1 != want_mode1 || got_mode3 != want_mode3)
+    TRY(readRegister(ADS126X_STATUS, &got_status));
+    if (got_mode1 != want_mode1 || got_mode3 != want_mode3 || (got_status & 0x01))
     {
-        ESP_LOGE(ADC_TAG, "Register readback mismath: MODE1 0x%02X/0x%02X MODE3 0x%02X/0x%02X",
-                 got_mode1, want_mode1, got_mode3, want_mode3);
+        ESP_LOGE(ADC_TAG, "Register readback mismath: MODE1 0x%02X/0x%02X MODE3 0x%02X/0x%02X STATUS 0x%02X (RESET bit should be 0)",
+                 got_mode1, want_mode1, got_mode3, want_mode3, got_status);
         return ESP_ERR_INVALID_RESPONSE;
     }
 
@@ -210,8 +229,8 @@ esp_err_t ADS126X::begin(void)
 esp_err_t ADS126X::readADC(uint8_t pos_mux, uint8_t neg_mux, int32_t *raw, uint32_t timeout_ms)
 {
     if (!initialized_)                      return ESP_ERR_INVALID_STATE;
-    if(raw== nullptr)                       return ESP_ERR_INVALID_ARG;
-    if(pos_mux > 0x0F || neg_mux > 0x0F)    return ESP_ERR_INVALID_ARG;
+    if (raw == nullptr)                       return ESP_ERR_INVALID_ARG;
+    if (pos_mux > 0x0F || neg_mux > 0x0F)    return ESP_ERR_INVALID_ARG;
     
     //1. Select the inputs (only touch the chip if something changed)
     if (REGISTER.INPMUX.bit.MUXP != pos_mux || REGISTER.INPMUX.bit.MUXN != neg_mux)
@@ -221,15 +240,21 @@ esp_err_t ADS126X::readADC(uint8_t pos_mux, uint8_t neg_mux, int32_t *raw, uint3
         TRY(writeRegister(ADS126X_INPMUX));
     }
 
-    //2. Start ONE conversion with pulse mode
-    TRY(startADC());
-
-    //3. Poll with RDATA until the status byte says the data is new (DRDY bit = 1)
     // RDATA with the STATUS byte is 6 bytes
     //      DIN: 12h, arbitrary, 00h,   00h,        00h,        00h
     //      DOUT: FFh, echo,    STATUS, data MSB, data MID, data LSB        datasheet table 21
     alignas(4) uint8_t tx[6] = { ADS126X_RDATA, 0x00, 0x00, 0x00, 0x00, 0x00};
-    alignas(4) uint8_t rx[6];
+    alignas(4) uint8_t rx[6] = {};
+
+
+    //2. clear any stale data from an earlier transfer
+    TRY(spiTransfer(tx, rx, sizeof(tx)));
+    TRY(checkFrame(ADS126X_RDATA, rx));
+    
+    // 3. Start ONE conversion (pulse mode)
+    TRY(startADC());
+
+    // 4. Poll with RDATA until status byte    
     const int64_t deadline_us = esp_timer_get_time() + (int64_t) timeout_ms * 1000;
 
     while (true)
@@ -246,10 +271,10 @@ esp_err_t ADS126X::readADC(uint8_t pos_mux, uint8_t neg_mux, int32_t *raw, uint3
             ESP_LOGE(ADC_TAG, "Timed out waiting for a conversion (is the clock running? is START pin held low?)");
             return ESP_ERR_TIMEOUT;
         }
-        delayMs(1);
+        vTaskDelay(1);
     }
 
-    //4. Assemble the 24-bit two's complement result and sign-extend it to 32 bits
+    //5. Assemble the 24-bit two's complement result and sign-extend it to 32 bits
     const uint32_t u = ((uint32_t) rx[3] << 16) | ((uint32_t) rx[4] << 8) | (uint32_t) rx[5];
     *raw = (int32_t) ((u ^ 0x800000u) - 0x800000u);
     return ESP_OK;
@@ -258,7 +283,7 @@ esp_err_t ADS126X::readADC(uint8_t pos_mux, uint8_t neg_mux, int32_t *raw, uint3
 // One LSB = VREF / (Gain * 2^23)  (datasheet Table 15)
 double ADS126X::toVolts(int32_t raw, double vref_volts) const
 {
-    const double gain = REGISTER.PGA. bit.BYPASS ? 1.0 : (double) (1u << REGISTER.PGA.bit.GAIN);
+    const double gain = REGISTER.PGA.bit.BYPASS ? 1.0 : (double) (1u << REGISTER.PGA.bit.GAIN);
     return (double) raw * vref_volts / (gain * 8388608.0);
 }
 
@@ -280,14 +305,14 @@ esp_err_t ADS126X::setIDAC2Pin(uint8_t pin)
 
 esp_err_t ADS126X::setIDAC1Mag(uint8_t magnitude)
 {
-    if (magnitude > 0x0F) return ESP_ERR_INVALID_ARG;
+    if (magnitude > ADS126X_IMAG_3000_UA) return ESP_ERR_INVALID_ARG;
     REGISTER.IMAG.bit.IMAG1 = magnitude;
     return commit(ADS126X_IMAG);
 }
 
 esp_err_t ADS126X::setIDAC2Mag(uint8_t magnitude)
 {
-    if (magnitude > 0x0F) return ESP_ERR_INVALID_ARG;
+    if (magnitude > ADS126X_IMAG_3000_UA) return ESP_ERR_INVALID_ARG;
     REGISTER.IMAG.bit.IMAG2 = magnitude;
     return commit(ADS126X_IMAG);
 }
@@ -328,7 +353,7 @@ esp_err_t ADS126X::enableInternalReference(void)
 
 esp_err_t ADS126X::disableInternalReference(void)
 {
-    REGISTER.REFMUX.bit.REFENB = 1;
+    REGISTER.REFMUX.bit.REFENB = 0;
     return commit(ADS126X_REFMUX);
 }
 
@@ -363,7 +388,7 @@ esp_err_t ADS126X::setFilter(uint8_t filter)
 
 esp_err_t ADS126X::setRate(uint8_t rate)
 {
-    if (rate > 0x1F) return ESP_ERR_INVALID_ARG;
+    if (rate > ADS126X_DR_40000) return ESP_ERR_INVALID_ARG;
     REGISTER.MODE0.bit.DR = rate;
     return commit(ADS126X_MODE0);
 }
@@ -415,13 +440,15 @@ esp_err_t ADS126X::gpioDisconnect(uint8_t pin)
 esp_err_t ADS126X::gpioDirection(uint8_t pin, uint8_t direction)
 {
     if (pin > 3) return ESP_ERR_INVALID_ARG;
+    if (direction != ADS126X_GPIO_OUTPUT && direction != ADS126X_GPIO_INPUT) return ESP_ERR_INVALID_ARG;
+    
     if (direction == ADS126X_GPIO_OUTPUT)
     {
-        REGISTER.MODE2.bit.GPIO_DIR = REGISTER.MODE2.bit.GPIO_DIR | (1u << pin);
+        REGISTER.MODE2.bit.GPIO_DIR = REGISTER.MODE2.bit.GPIO_DIR & ~(1u << pin);
     }
     else
     {
-        REGISTER.MODE2.bit.GPIO_DIR = REGISTER.MODE2.bit.GPIO_DIR & ~(1u << pin);
+        REGISTER.MODE2.bit.GPIO_DIR = REGISTER.MODE2.bit.GPIO_DIR | (1u << pin);
     }
     return commit(ADS126X_MODE2);
 }
