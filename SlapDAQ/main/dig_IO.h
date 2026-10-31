@@ -7,6 +7,10 @@
 #include "driver/gpio.h"
 #include "hal/spi_types.h"
 
+/*Relevant includes*/
+#include <stdint.h>
+#include <stddef.h>
+#include "esp_err.h"
 
 /*Digital GPIO Variables*/
 #define GPIO_4 GPIO_NUM_4
@@ -27,8 +31,21 @@ static const gpio_num_t DIO_PINS[8] =
     GPIO_NUM_15, GPIO_NUM_16, GPIO_NUM_17,
     GPIO_NUM_18
 };
+
+/*
+
+    TCP byte streams are like this:
+
+    [type][mask]
+
+    type 0x01 (MSG_SET_DIO_DIR):    bit n = 1 -> DIO_PINS[n] becomes an output, 0 -> input
+    type 0x02 (MSG_SET_DIO_LEVEL):    bit n = 1 -> DIO_PINS[n] high, 0 -> low (only affects outputs)
+
+*/
+
 constexpr uint8_t MSG_SET_DIO_DIR = 0x01;
 constexpr uint8_t MSG_SET_DIO_LEVEL = 0x02;
+constexpr size_t DIO_PACKET_LEN = 2;
 
 
 #ifdef __cplusplus
@@ -37,8 +54,9 @@ extern "C" {
 
 /*Function Declaration*/
 esp_err_t set_all_pins_as_input(void);
-bool parseDioConfigPacket(const uint8_t *buf, size_t len, uint8_t *type, uint8_t *dir_mask);
+bool parseDioConfigPacket(const uint8_t *buf, size_t len, uint8_t *type, uint8_t *mask);
 esp_err_t applyDioDirections(uint8_t dir_mask);
+esp_err_t applyDioLevels(uint8_t level_mask);
 uint8_t read_all_pins(void);
 
 #ifdef __cplusplus

@@ -24,7 +24,7 @@ static void delayMs(uint32_t ms)
 /****************LOW-LEVEL SPI**************/
 esp_err_t ADS126X::spiTransfer(const uint8_t *tx, uint8_t *rx, size_t len)
 {
-    return spi_transfer(spi_adc1_handle, tx, rx, len);
+    return spi_transfer(spi_adc_handle, tx, rx, len);
 }
 
 // every replay starts with FFh, then echos 1 byte of a command (datasheet Tables 17-26)
@@ -33,7 +33,8 @@ esp_err_t ADS126X::checkFrame(uint8_t sent_cmd, const uint8_t *rx)
 {
     if (rx[0] != 0xFF || rx[1] != sent_cmd)
     {
-        ESP_LOGE(ADC_TAG, "Bad replay to cmd 0x%02X: got 0x%02X%02X (want 0xFF%02X)", sent_cmd, rx[0], rx[1], sent_cmd);
+        ESP_LOGE(ADC_TAG, "Bad replay to cmd 0x%02X: got 0x%02X%02X (want 0xFF%02X)",
+                 sent_cmd, rx[0], rx[1], sent_cmd);
         
         // add logs for common ADC responses
         if (rx[0] == 0x00 && rx[1] == 0x00)
@@ -497,4 +498,17 @@ esp_err_t ADS126X::setGain(uint8_t gain)
     return commit(ADS126X_PGA);
 }
 
+esp_err_t ADS126X::setPGA(bool bypass, uint8_t gain)
+{
+    if (!initialized_) return ESP_ERR_INVALID_STATE;
+    if (gain > ADS126X_PGA_GAIN_128) return ESP_ERR_INVALID_ARG;
 
+    ADS126X_PGA_Type want = REGISTER.PGA;
+    want.bit.BYPASS = bypass ? ADS126X_PGA_BYPASS : ADS126X_PGA_MODE;
+    want.bit.GAIN = bypass ? ADS126X_PGA_GAIN_1 : gain;
+
+    if (want.reg == REGISTER.PGA.reg) return ESP_OK;
+
+    REGISTER.PGA = want;
+    return writeRegister(ADS126X_PGA);
+}

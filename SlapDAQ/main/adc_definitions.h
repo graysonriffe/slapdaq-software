@@ -443,25 +443,25 @@ typedef union
 /* The entire register map structure */
 typedef struct
 {
-    __IO ADS126X_ID_Type            ID;         // Offset: 0x00 (R/W 8) Device Identification
-    __IO ADS126X_STATUS_Type        STATUS;     // Offset: 0x01 (R/W 8) Device Status
-    __IO ADS126X_MODE0_Type         MODE0;      // Offset: 0x02 (R/W 8) Mode 0
-    __IO ADS126X_MODE1_Type         MODE1;      // Offset: 0x03 (R/W 8) Mode 1
-    __IO ADS126X_MODE2_Type         MODE2;      // Offset: 0x04 (R/W 8) Mode 2
-    __IO ADS126X_MODE3_Type         MODE3;      // Offset: 0x05 (R/W 8) Mode 3
-    __IO ADS126X_REF_Type           REFMUX;     // Offset: 0x06 (R/W 8) Reference Configuration
-    __IO ADS126X_OFCAL_Type         OFCAL0;     // Offset: 0x07 (R/W 8) Offset Calibration 0
-    __IO ADS126X_OFCAL_Type         OFCAL1;     // Offset: 0x08 (R/W 8) Offset Calibration 1
-    __IO ADS126X_OFCAL_Type         OFCAL2;     // Offset: 0x09 (R/W 8) Offset Calibration 2
-    __IO ADS126X_FSCAL_Type         FSCAL0;     // Offset: 0x0A (R/W 8) Full-Scale Calibration 0
-    __IO ADS126X_FSCAL_Type         FSCAL1;     // Offset: 0x0B (R/W 8) Full-Scale Calibration 1
-    __IO ADS126X_FSCAL_Type         FSCAL2;     // Offset: 0x0C (R/W 8) Full-Scale Calibration 2
-    __IO ADS126X_IMUX_Type          IMUX;       // Offset: 0x0D (R/W 8) IDAC Multiplexer
-    __IO ADS126X_IMAG_Type          IMAG;       // Offset: 0x0E (R/W 8) IDAC Magnitude
-    __IO ADS126X_RESERVED_Type      RESERVED;   // Offset: 0x0F (R/W 8) Reserved
-    __IO ADS126X_PGA_Type           PGA;        // Offset: 0x10 (R/W 8) PGA Configuration
-    __IO ADS126X_INPMUX_Type        INPMUX;     // Offset: 0x11 (R/W 8) Input Multiplexer
-    __IO ADS126X_INPBIAS_Type       INPBIAS;    // Offset: 0x12 (R/W 8) Input Bias
+    ADS126X_ID_Type            ID;         // Offset: 0x00 (R/W 8) Device Identification
+    ADS126X_STATUS_Type        STATUS;     // Offset: 0x01 (R/W 8) Device Status
+    ADS126X_MODE0_Type         MODE0;      // Offset: 0x02 (R/W 8) Mode 0
+    ADS126X_MODE1_Type         MODE1;      // Offset: 0x03 (R/W 8) Mode 1
+    ADS126X_MODE2_Type         MODE2;      // Offset: 0x04 (R/W 8) Mode 2
+    ADS126X_MODE3_Type         MODE3;      // Offset: 0x05 (R/W 8) Mode 3
+    ADS126X_REF_Type           REFMUX;     // Offset: 0x06 (R/W 8) Reference Configuration
+    ADS126X_OFCAL_Type         OFCAL0;     // Offset: 0x07 (R/W 8) Offset Calibration 0
+    ADS126X_OFCAL_Type         OFCAL1;     // Offset: 0x08 (R/W 8) Offset Calibration 1
+    ADS126X_OFCAL_Type         OFCAL2;     // Offset: 0x09 (R/W 8) Offset Calibration 2
+    ADS126X_FSCAL_Type         FSCAL0;     // Offset: 0x0A (R/W 8) Full-Scale Calibration 0
+    ADS126X_FSCAL_Type         FSCAL1;     // Offset: 0x0B (R/W 8) Full-Scale Calibration 1
+    ADS126X_FSCAL_Type         FSCAL2;     // Offset: 0x0C (R/W 8) Full-Scale Calibration 2
+    ADS126X_IMUX_Type          IMUX;       // Offset: 0x0D (R/W 8) IDAC Multiplexer
+    ADS126X_IMAG_Type          IMAG;       // Offset: 0x0E (R/W 8) IDAC Magnitude
+    ADS126X_RESERVED_Type      RESERVED;   // Offset: 0x0F (R/W 8) Reserved
+    ADS126X_PGA_Type           PGA;        // Offset: 0x10 (R/W 8) PGA Configuration
+    ADS126X_INPMUX_Type        INPMUX;     // Offset: 0x11 (R/W 8) Input Multiplexer
+    ADS126X_INPBIAS_Type       INPBIAS;    // Offset: 0x12 (R/W 8) Input Bias
 } ADS126X_REGISTER_Type;
 
 // make sure above struct is 19 bytes

@@ -6,6 +6,11 @@
 /*SPI Includes*/
 #include "spi_DAQ.h"
 
+/*General Includes*/
+#include <stdint.h>
+#include <stddef.h>
+#include "esp_err.h"
+
 /*MAX31856 Hex Macros*/
 #define MAX31856_CR0_REG 0x00         ///< Config 0 register
 #define MAX31856_CR0_AUTOCONVERT 0x80 ///< Config 0 Auto convert flag
@@ -15,6 +20,7 @@
 #define MAX31856_CR0_CJ 0x08          ///< Config 0 cold junction disable flag
 #define MAX31856_CR0_FAULT 0x04       ///< Config 0 fault mode flag
 #define MAX31856_CR0_FAULTCLR 0x02    ///< Config 0 fault clear flag
+#define MAX31856_CR0_50HZ 0x01        // 1 = 50 Hz, 0 = 60 Hz
 
 #define MAX31856_CR1_REG 0x01  ///< Config 1 register
 #define MAX31856_MASK_REG 0x02 ///< Fault Mask register
@@ -87,15 +93,14 @@ typedef enum
 class SlapDAQ_MAX31856
 {
     public:
-        SlapDAQ_MAX31856(void);
 
         bool thermoInit(void);
 
-        void setConversionMode(max31856_conversion_mode_t mode);
-        max31856_conversion_mode_t getConversionMode(void);
+        esp_err_t setConversionMode(max31856_conversion_mode_t mode);
+        max31856_conversion_mode_t getConversionMode(void) const;
 
-        void setThermocoupleType(max31856_thermocoupletype_t);
-        max31856_thermocoupletype_t getThermocoupleType(uint8_t *type);
+        esp_err_t setThermocoupleType(max31856_thermocoupletype_t type);
+        esp_err_t getThermocoupleType(max31856_thermocoupletype_t *type);
 
         esp_err_t readFault(uint8_t *fault);
 
@@ -104,33 +109,21 @@ class SlapDAQ_MAX31856
         float readCJTemperature(void);
         float readThermocoupleTemperature(void);
 
-        void setTempFaultThresholds(float flow, float fhigh);
-        void setColdJunctionFaultThresholds(int8_t low, int8_t high);
-        void setNoiseFilter(max31856_noise_filter_t noiseFilter);
+        esp_err_t setTempFaultThresholds(float flow, float fhigh);
+        esp_err_t setColdJunctionFaultThresholds(int8_t low, int8_t high);
+        esp_err_t setNoiseFilter(max31856_noise_filter_t noiseFilter);
 
     private:
 
-        max31856_conversion_mode_t conversionMode;
-        int8_t _csPin;
+        max31856_conversion_mode_t conversionMode = MAX31856_ONESHOT;
 
         esp_err_t readRegister8(uint8_t addr, uint8_t *data);
-
         esp_err_t writeRegister8(uint8_t addr, uint8_t data);
-
-
+        esp_err_t readRegisters(uint8_t addr, uint8_t *data, size_t count);
 
 
 };
 
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif

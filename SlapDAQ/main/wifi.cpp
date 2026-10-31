@@ -2,8 +2,36 @@
 //necessary imports
 #include "wifi.h"
 
+static const char* WIFI_TAG = "wifi";
+
 static int s_listenFD = -1;
 static int s_clientFD = -1;
+
+// variables to hold the bytes of partially received host packet
+static uint8_t s_rxBuf[16];
+static size_t s_rxLen = 0;
+
+// close the current client (if any)
+static void drop_client(void)
+{
+    if (s_clientFD >= 0)
+    {
+        close(s_clientFD);
+        s_clientFD = -1;
+    }
+    s_rxLen = 0;
+}
+
+static void configure_client_socket(int fd)
+{
+    // send small packets instead of one large packet
+    int one = 1;
+    setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));
+
+    // check to make sure TCP send doesn't delay measurement loop
+    timeval snd_timeout = {1, 0};
+    setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &snd_timeout, sizeof(snd_timeout));
+}
 
 bool wifi_initialize(void) {
     ESP_LOGI(WIFI_TAG, "Initializing...");
@@ -58,8 +86,7 @@ bool wifi_initialize(void) {
 
     int socketFD = socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
     if (socketFD < 0) {
-        ESP_LOGE(WIFI_TAG, "Could not create socket.");
-        close(socketFD);
+        ESP_LOGE(WIFI_TAG, "Could not create socket, errno=%d", errno);
         return false;
     }
 
@@ -67,7 +94,7 @@ bool wifi_initialize(void) {
     sockaddr_in serverAddress = {};
     serverAddress.sin_family = AF_INET;
     serverAddress.sin_addr.s_addr = htonl(INADDR_ANY);
-    serverAddress.sin_port = htons(15000);
+    serverAddress.sin_port = htons(WIFI_TCP_PORT);
 
     // quick rebinding after a reboot
     int opt = 1;
@@ -77,14 +104,14 @@ bool wifi_initialize(void) {
     //Bind for listening
     int err = bind(socketFD, (sockaddr*)&serverAddress, sizeof(serverAddress));
     if (err != 0) {
-        ESP_LOGE(WIFI_TAG, "Could not bind socket!");
+        ESP_LOGE(WIFI_TAG, "Could not bind socket! errno=%d", errno);
         close(socketFD);
         return false;
     }
 
     err = listen(socketFD, 1);
     if (err != 0) {
-        ESP_LOGE(WIFI_TAG, "Could not start listening!");
+        ESP_LOGE(WIFI_TAG, "Could not start listening! errno=%d", errno);
         close(socketFD);
         return false;
     }
@@ -92,13 +119,12 @@ bool wifi_initialize(void) {
     s_listenFD = socketFD;
     ESP_LOGI(WIFI_TAG, "Listening on port 15000");
     return true;
-
 }
 
 bool wifi_client_connected(int timeout_ms)
 {
-    if (s_clientFD >= 0) return true;
     if (s_listenFD < 0) return false;
+    if (s_clientFD >= 0) timeout_ms = 0;
 
     fd_set readSet;
     FD_ZERO(&readSet);
@@ -110,7 +136,7 @@ bool wifi_client_connected(int timeout_ms)
     if (sel < 0)
     {
         ESP_LOGE(WIFI_TAG, "select failed, errno=%d", errno);
-        return false;
+        return s_clientFD >= 0;
     }
 
     if (sel > 0)
@@ -121,27 +147,39 @@ bool wifi_client_connected(int timeout_ms)
         
         if (fd >= 0)
         {
+            if (s_clientFD >= 0)
+            {
+                ESP_LOGW(WIFI_TAG, "New connection replaces the previous client");
+            }
+            drop_client();
+            configure_client_socket(fd);
             s_clientFD = fd;
             ESP_LOGI(WIFI_TAG, "Got connection from %s. Sending data", inet_ntoa(clientAddress.sin_addr));
-            return true;
         }
-
-        if (fd < 0) ESP_LOGE(WIFI_TAG, "accept failed, errno=%d", errno);
+        else
+        {
+            ESP_LOGE(WIFI_TAG, "accept failed, errno=%d", errno);
+        }
     }
-    return false;
-    
-
+    return s_clientFD >= 0;
 }
 
 bool wifi_send(const char *data, size_t len)
 {
     if(s_clientFD < 0) return false;
-    if (send(s_clientFD, data, len, 0) < 0)
+
+    size_t sent = 0;
+    while (sent < len)
     {
-        ESP_LOGW(WIFI_TAG, "Send failed, closing client");
-        close(s_clientFD);
-        s_clientFD = -1;
-        return false;
+        ssize_t n = send(s_clientFD, data + sent, len - sent, 0);
+        if (n < 0)
+        {
+            if (errno == EINTR) continue;
+            ESP_LOGW(WIFI_TAG, "Send failed, closing client");
+            drop_client();
+            return false;
+        }
+        sent += (size_t) n;
     }
     return true;
 }
@@ -150,22 +188,36 @@ int wifi_receive(uint8_t *buf, size_t len)
 {
     if (s_clientFD < 0) return 0;
 
-    int n = recv(s_clientFD, buf, len, MSG_DONTWAIT);
+    ssize_t n = recv(s_clientFD, buf, len, MSG_DONTWAIT);
 
-    if (n > 0) return n;
+    if (n > 0) return (int) n;
 
     if (n == 0)
     {
         ESP_LOGW(WIFI_TAG, "Client disconnected, closing socket");
-        close(s_clientFD);
-        s_clientFD = -1;
+        drop_client();
         return -1;
     }
 
     if (errno == EAGAIN || errno == EWOULDBLOCK) return 0;
 
     ESP_LOGW(WIFI_TAG, "Recieve failed (errno=%d, closing client", errno);
-    close(s_clientFD);
-    s_clientFD = -1;
+    drop_client();
     return -1;
+}
+
+bool wifi_receive_packet(uint8_t *pkt, size_t len)
+{
+    if (pkt == nullptr || len == 0 || len > sizeof(s_rxBuf)) return false;
+
+    while (s_rxLen < len)
+    {
+        int n = wifi_receive(s_rxBuf + s_rxLen, len - s_rxLen);
+        if (n <= 0) return false;
+        s_rxLen += (size_t) n;
+    }
+
+    memcpy(pkt, s_rxBuf, len);
+    s_rxLen = 0;
+    return true;
 }

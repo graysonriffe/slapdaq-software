@@ -7,7 +7,6 @@
 #include <stddef.h>
 #include "esp_err.h"
 #include "adc_definitions.h"
-#include "dig_IO.h"
 #include "spi_DAQ.h"
 
 
@@ -90,6 +89,7 @@ class ADS126X
         esp_err_t enablePGA(void);
         esp_err_t disablePGA(void);         // = PGA bypass
         esp_err_t setGain(uint8_t gain);
+        esp_err_t setPGA(bool bypass, uint8_t gain);
 
         //----Rgister-level access
         esp_err_t sendCommand(uint8_t command);

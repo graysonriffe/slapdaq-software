@@ -4,34 +4,24 @@
 
 //Necessary Imports
 #include <stdint.h>
-#include "wifi.h"
+#include <stddef.h>
+#include <string.h>
 
+// 4 single-ended voltage + 1 differential voltage + 2 (4-20 mA) = 7 total channels
+constexpr size_t ADC_NUM_CHANNELS = 7;
 
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/*Global Necessary Variables*/
-static const char* STRUCT_TAG = "struct-test";
-
-/*Struct to Send Data*/
-#pragma pack(push, 1)
 struct SensorData
 {
     uint8_t digitalIOData;
-    uint32_t tempData;
-    uint32_t adcData;
+    int32_t tempData;           // temps and ADC codes can be negative so this needs to be int32 intead of uint32
+    float adcData[ADC_NUM_CHANNELS];
 };
-#pragma pack(pop)
 
-static_assert(sizeof(SensorData) == 9, "SensorData must be 9 bytes");
+constexpr size_t SENSOR_PACKET_LEN = 1 + 4 + 4 * ADC_NUM_CHANNELS;  // 33
 
 /*Function Declaration*/
+void serializeSensorData(const SensorData &data, uint8_t out[SENSOR_PACKET_LEN]);
 bool sendStructOverWifi(const SensorData &data);
 
-#ifdef __cplusplus
-}
-#endif
 
 #endif

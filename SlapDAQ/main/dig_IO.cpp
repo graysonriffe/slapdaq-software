@@ -19,21 +19,20 @@ esp_err_t set_all_pins_as_input(void)
 
 }
 
-/*
 
-    TCP byte streams are like this:
-
-    0x00 means everything is an input
-    0x01 means that digital IO port associated with place 8 is an output now
-
-*/
 
 bool parseDioConfigPacket(const uint8_t *buf, size_t len, uint8_t *type, uint8_t *mask)
 {
-    if (len < 2 || buf[0] != MSG_SET_DIO_DIR)
+    if (buf == nullptr || type == nullptr || mask == nullptr || len < DIO_PACKET_LEN)
     {
         return false;
     }
+    
+    if (buf[0] != MSG_SET_DIO_DIR && buf[0] != MSG_SET_DIO_LEVEL)
+    {
+        return false;
+    }
+    *type = buf[0];
     *mask = buf[1];
     return true;
 }
@@ -45,9 +44,27 @@ esp_err_t applyDioDirections(uint8_t dir_mask)
     for (index = 0; index < 8; index++)
     {
         bool is_output = (dir_mask>>index) & 0x01;
-        gpio_mode_t mode = is_output ? GPIO_MODE_OUTPUT : GPIO_MODE_INPUT;
+        gpio_mode_t mode = is_output ? GPIO_MODE_INPUT_OUTPUT : GPIO_MODE_INPUT;
 
         esp_err_t err = gpio_set_direction(DIO_PINS[index], mode);
+        if (err != ESP_OK)
+        {
+            return err;
+        }
+    }
+    return ESP_OK;
+}
+
+// a function to set the level of the input. Used for when a pin becomes an output
+esp_err_t applyDioLevels(uint8_t level_mask)
+{
+    int index;
+
+    for (index = 0; index < 8; index++)
+    {
+        uint32_t level = (level_mask >> index) & 0x01;
+
+        esp_err_t err = gpio_set_level(DIO_PINS[index], level);
         if (err != ESP_OK)
         {
             return err;
@@ -62,8 +79,8 @@ uint8_t read_all_pins(void)
     int index;
     for (index = 0; index < 8; index++)
     {
-        uint8_t level = gpio_get_level(DIO_PINS[index]);
-        bits |= (level << index);
+        uint8_t level = (uint8_t) (gpio_get_level(DIO_PINS[index]) & 0x01);
+        bits |= (uint8_t) (level << index);
     }
     return bits;
 }
