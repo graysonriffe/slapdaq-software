@@ -1,12 +1,4 @@
-
-#ifndef ADC_DEFINITIONS_H
-#define ADC_DEFINITIONS_H
-
-#include <stdint.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
+#pragma once
 
 #ifndef __IO
 #define __IO volatile
@@ -466,10 +458,3 @@ typedef struct
 
 // make sure above struct is 19 bytes
 static_assert(sizeof(ADS126X_REGISTER_Type) == ADS126X_REG_NUM, "register map must be 19 bytes");
-
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif

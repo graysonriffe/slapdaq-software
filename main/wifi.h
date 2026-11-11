@@ -1,13 +1,8 @@
-
-#ifndef WIFI_H
-#define WIFI_H
+#pragma once
 
 //Necessary imports
 #include <string.h>
 #include <errno.h>
-#include <unistd.h>
-#include <stdint.h>
-#include <stddef.h>
 
 #include "esp_log.h"
 #include "esp_event.h"
@@ -16,18 +11,9 @@
 #include "esp_netif.h"
 #include "lwip/sockets.h"
 
-
 #define WIFI_PASSWORD   "dummyPassword"
 #define WIFI_SSID       "Main SLAPDAQ"
 #define WIFI_TCP_PORT   15000
-
-
-
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 
 /*Function Declaration*/
 bool wifi_initialize(void);
@@ -43,9 +29,3 @@ int wifi_receive(uint8_t *buf, size_t len);
 
 // read function to obtain a full packet
 bool wifi_receive_packet(uint8_t *pkt, size_t len);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif

@@ -1,13 +1,11 @@
-
 //includes
 #include "spi_DAQ.h"
 #include "esp_log.h"
 
-static const char *SPI_TAG = "SPI";
+static const char* SPI_TAG = "SPI";
 
 spi_device_handle_t spi_thermo_handle = nullptr;
 spi_device_handle_t spi_adc_handle = nullptr;
-
 
 esp_err_t SPI_Init(void)
 {
@@ -55,8 +53,6 @@ esp_err_t SPI_Init(void)
         return SPI_ret;
     }
 
-
-
     /*
     -------------------------------------------------------------------------------
     Configuring ADC SPI
@@ -95,5 +91,3 @@ esp_err_t spi_transfer(spi_device_handle_t dev, const uint8_t *tx_data, uint8_t 
     transaction.rx_buffer = rx_data;
     return spi_device_transmit(dev, &transaction);
 }
-
-

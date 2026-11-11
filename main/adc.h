@@ -1,6 +1,4 @@
-
-#ifndef ADC_H
-#define ADC_H
+#pragma once
 
 //Necessary Imports
 #include <stdint.h>
@@ -112,9 +110,3 @@ class ADS126X
         uint8_t start_pin = 0;
 
 };
-
-
-
-
-
-#endif

@@ -20,7 +20,6 @@ static void delayMs(uint32_t ms)
     vTaskDelay(ticks ? ticks : 1);
 }
 
-
 /****************LOW-LEVEL SPI**************/
 esp_err_t ADS126X::spiTransfer(const uint8_t *tx, uint8_t *rx, size_t len)
 {

@@ -1,4 +1,3 @@
-
 //Necessary imports
 #include "dig_IO.h"
 
@@ -18,8 +17,6 @@ esp_err_t set_all_pins_as_input(void)
     return gpio_config(&io_config);
 
 }
-
-
 
 bool parseDioConfigPacket(const uint8_t *buf, size_t len, uint8_t *type, uint8_t *mask)
 {

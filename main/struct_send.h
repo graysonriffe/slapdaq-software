@@ -1,6 +1,5 @@
 
-#ifndef STRUCT_SEND_H
-#define STRUCT_SEND_H
+#pragma once
 
 //Necessary Imports
 #include <stdint.h>
@@ -13,7 +12,7 @@ constexpr size_t ADC_NUM_CHANNELS = 7;
 struct SensorData
 {
     uint8_t digitalIOData;
-    int32_t tempData;           // temps and ADC codes can be negative so this needs to be int32 intead of uint32
+    float tempData;           // temps and ADC codes can be negative so this needs to be int32 intead of uint32
     float adcData[ADC_NUM_CHANNELS];
 };
 
@@ -22,6 +21,3 @@ constexpr size_t SENSOR_PACKET_LEN = 1 + 4 + 4 * ADC_NUM_CHANNELS;  // 33
 /*Function Declaration*/
 void serializeSensorData(const SensorData &data, uint8_t out[SENSOR_PACKET_LEN]);
 bool sendStructOverWifi(const SensorData &data);
-
-
-#endif

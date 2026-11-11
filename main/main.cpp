@@ -2,7 +2,6 @@
 /*Logging includes*/
 #define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
 #include "esp_log.h"
-#define LOG_TAG "MAIN"
 
 /*Standard Library*/
 #include <stdio.h>
@@ -11,9 +10,6 @@
 
 /*FreeRTOS includes*/
 #include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/event_groups.h"
-#include "esp_event.h"
 
 /*SPI Includes*/
 #include "spi_DAQ.h"
@@ -23,9 +19,6 @@
 
 /*Digital GPIO Includes*/
 #include "dig_IO.h"
-
-/*C Standard I/O*/
-#include <stdio.h>
 
 /*Thermocouple header*/
 #include "thermo.h"
@@ -37,12 +30,6 @@
 #include "struct_send.h"
 
 /*Global Variables*/
-
-// Reference voltage ADC uses in volts. Default reference = AVDD - AVSS
-static const double ADC_VREF_VOLTS = 5.0;
-
-// temp scale on the wire
-static const float TEMP_SCALE = 1.0f;
 
 // retry sensor init (loops = seconds)
 static const uint32_t SENSOR_RETRY_LOOPS = 5;
@@ -71,21 +58,18 @@ static constexpr float SHUNT_OHMS = 1.0f;
 static constexpr AdcChannel ADC_CHANNELS[] =
 {
     // name        pos                 neg         bypass      gain               kind          shunt
-    { "V4", ADS126X_MUXP_AIN2, ADS126X_MUXN_AINCOM, true, ADS126X_PGA_GAIN_1, AdcKind::Voltage,              0.0f},
-    { "V3", ADS126X_MUXP_AIN3, ADS126X_MUXN_AINCOM, true, ADS126X_PGA_GAIN_1, AdcKind::Voltage,              0.0f},
-    { "V2", ADS126X_MUXP_AIN4, ADS126X_MUXN_AINCOM, true, ADS126X_PGA_GAIN_1, AdcKind::Voltage,              0.0f},
-    { "V1", ADS126X_MUXP_AIN5, ADS126X_MUXN_AINCOM, true, ADS126X_PGA_GAIN_1, AdcKind::Voltage,              0.0f},
+    { "AV1", ADS126X_MUXP_AIN5, ADS126X_MUXN_AINCOM, true, ADS126X_PGA_GAIN_1, AdcKind::Voltage,              0.0f},
+    { "AV2", ADS126X_MUXP_AIN4, ADS126X_MUXN_AINCOM, true, ADS126X_PGA_GAIN_1, AdcKind::Voltage,              0.0f},
+    { "AV3", ADS126X_MUXP_AIN3, ADS126X_MUXN_AINCOM, true, ADS126X_PGA_GAIN_1, AdcKind::Voltage,              0.0f},
+    { "AV4", ADS126X_MUXP_AIN2, ADS126X_MUXN_AINCOM, true, ADS126X_PGA_GAIN_1, AdcKind::Voltage,              0.0f},
 
-    { "DIFF", ADS126X_MUXP_AIN6, ADS126X_MUXN_AIN7, true, ADS126X_PGA_GAIN_1, AdcKind::Voltage,              0.0f},
+    { "DV", ADS126X_MUXP_AIN6, ADS126X_MUXN_AIN7, true, ADS126X_PGA_GAIN_1, AdcKind::Voltage,                 0.0f},
 
-    { "I2", ADS126X_MUXP_AIN8, ADS126X_MUXN_AINCOM, true, ADS126X_PGA_GAIN_1, AdcKind::Current_4_20mA,      SHUNT_OHMS},
-    { "I1", ADS126X_MUXP_AIN9, ADS126X_MUXN_AINCOM, true, ADS126X_PGA_GAIN_1, AdcKind::Current_4_20mA,      SHUNT_OHMS},
+    { "AC1", ADS126X_MUXP_AIN9, ADS126X_MUXN_AINCOM, true, ADS126X_PGA_GAIN_1, AdcKind::Current_4_20mA,       SHUNT_OHMS},
+    { "AC2", ADS126X_MUXP_AIN8, ADS126X_MUXN_AINCOM, true, ADS126X_PGA_GAIN_1, AdcKind::Current_4_20mA,       SHUNT_OHMS},
 };
 
-// limits set for the current loop
-static const float LOOP_FAULT_LOW_MA = 3.6f;
-static const float LOOP_FAULT_HIGH_MA = 21.0f;
-
+static const char* LOG_TAG = "MAIN";
 
 // Function that displays the thermocouple faults to the serial monitor for debugging
 static void logThermoFault(uint8_t fault)
@@ -134,19 +118,6 @@ static void handleHostCommand(const uint8_t *pkt)
     }
 }
 
-// function to convert temp in C to int32 when sending to host
-static int32_t tempToWire(float temp_c)
-{
-    if (isnan(temp_c)) return 0;
-
-    float scaled = temp_c * TEMP_SCALE;
-    if (scaled > 2.0e9f) scaled = 2.0e9f;
-    if (scaled < -2.0e9f) scaled = -2.0e9f;
-
-    // static_cast trucated to zero, rouding is more accurate
-    return (int32_t) lround(scaled);
-}
-
 // begin() RESETS the chips, which wipes any setting made after it.
 static bool configureAdc(ADS126X &adc)
 {
@@ -181,7 +152,7 @@ static esp_err_t readChannel(ADS126X &adc, const AdcChannel &c, float *value)
     if (err != ESP_OK) return err;
 
     // 3. convert code to volts
-    const double volts = adc.toVolts(raw, ADC_VREF_VOLTS);
+    const double volts = adc.toVolts(raw, 3.3);
 
     // 4. volts to channel's unit
     if (c.kind == AdcKind::Current_4_20mA)
@@ -197,7 +168,6 @@ static esp_err_t readChannel(ADS126X &adc, const AdcChannel &c, float *value)
 
 extern "C" void app_main(void)
 {
-
     /******************************************************** */
     /*                INITIALIZATION                          */
     /******************************************************** */
@@ -256,14 +226,9 @@ extern "C" void app_main(void)
         ESP_LOGE(LOG_TAG, "ADC begin() failed - retrying every %" PRIu32 " s", SENSOR_RETRY_LOOPS);
     }
 
-
-
-
-
     /******************************************************** */
     /*                MAIN LOOP                               */
     /******************************************************** */
-
 
     bool was_connected = false;
     uint8_t last_fault = 0;
@@ -365,29 +330,19 @@ extern "C" void app_main(void)
             const bool is_current = (c.kind == AdcKind::Current_4_20mA);
             const float v = adc_value[ch];
 
-            // check if 4-20 mA loops are open
-            const char *flag = "";
-            if (is_current && !isnan(v))
-            {
-                if (v < LOOP_FAULT_LOW_MA)      flag = " [LOOP OPEN?]";
-                else if (v > LOOP_FAULT_HIGH_MA) flag = " [LOOP FAULT]";
-            }
-
-            int n = snprintf(adc_line + pos, sizeof(adc_line) - pos, "%s %s %.4f %s%s",
-                             (ch == 0) ? "" : " |", c.name, (double) v, is_current ? "mA" : "V", flag);
+            int n = snprintf(adc_line + pos, sizeof(adc_line) - pos, "%s %s %.4f %s",
+                             (ch == 0) ? "" : " |", c.name, (double) v, is_current ? "mA" : "V");
             if (n < 0 || pos + n >= (int) sizeof(adc_line)) break;
             pos += n;
         }
         ESP_LOGI(LOG_TAG, "ADC%s%s", adc_line, adc_ok ? "" : " [ADC offline]");
-
-
 
         /*------------- send measurements to PC -----------*/
         if (connected)
         {
             SensorData measurements = {};
             measurements.digitalIOData = digital_bits;
-            measurements.tempData = tempToWire(temp_c);
+            measurements.tempData = temp_c;
             for (size_t ch = 0; ch < ADC_NUM_CHANNELS; ch++)
             {
                 measurements.adcData[ch] = adc_value[ch];

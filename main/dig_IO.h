@@ -1,16 +1,8 @@
-
-#ifndef DIG_IO_H
-#define DIG_IO_H
+#pragma once
 
 //necessary imports
 /*GPIO Inclues*/
 #include "driver/gpio.h"
-#include "hal/spi_types.h"
-
-/*Relevant includes*/
-#include <stdint.h>
-#include <stddef.h>
-#include "esp_err.h"
 
 /*Digital GPIO Variables*/
 #define GPIO_4 GPIO_NUM_4
@@ -47,20 +39,9 @@ constexpr uint8_t MSG_SET_DIO_DIR = 0x01;
 constexpr uint8_t MSG_SET_DIO_LEVEL = 0x02;
 constexpr size_t DIO_PACKET_LEN = 2;
 
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /*Function Declaration*/
 esp_err_t set_all_pins_as_input(void);
 bool parseDioConfigPacket(const uint8_t *buf, size_t len, uint8_t *type, uint8_t *mask);
 esp_err_t applyDioDirections(uint8_t dir_mask);
 esp_err_t applyDioLevels(uint8_t level_mask);
 uint8_t read_all_pins(void);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif

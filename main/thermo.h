@@ -1,15 +1,8 @@
-
-#ifndef THERMO_H
-#define THERMO_H
+#pragma once
 
 //Necessary Imports
 /*SPI Includes*/
 #include "spi_DAQ.h"
-
-/*General Includes*/
-#include <stdint.h>
-#include <stddef.h>
-#include "esp_err.h"
 
 /*MAX31856 Hex Macros*/
 #define MAX31856_CR0_REG 0x00         ///< Config 0 register
@@ -120,10 +113,4 @@ class SlapDAQ_MAX31856
         esp_err_t readRegister8(uint8_t addr, uint8_t *data);
         esp_err_t writeRegister8(uint8_t addr, uint8_t data);
         esp_err_t readRegisters(uint8_t addr, uint8_t *data, size_t count);
-
-
 };
-
-
-
-#endif
