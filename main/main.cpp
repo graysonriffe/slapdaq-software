@@ -125,11 +125,14 @@ static bool configureAdc(ADS126X &adc)
 
     // configure the default and desired settings here such as
     // data rate, filter, reference,...
-    if (err == ESP_OK) err = adc.setRate(ADS126X_DR_20);
-    if (err == ESP_OK) err = adc.setFilter(ADS126X_FILTER_FIR);
+    if (err == ESP_OK) err = adc.setRate(ADS126X_DR_40000);
+    adc.disablePGA();
+    adc.setReference(ADS126X_RMUXN_INTRN_AIN1, ADS126X_RMUXP_INTRN_AIN0);
+    // if (err == ESP_OK) err = adc.setFilter(ADS126X_FILTER_FIR);
     //if (err == ESP_OK) err = adc.setDelay(ADS126X_DELAY_50_US);
-    if (err == ESP_OK) err = adc.disableInternalReference();
+    // if (err == ESP_OK) err = adc.disableInternalReference();
     
+    adc.startADC();
 
     if (err != ESP_OK)
     {
@@ -147,12 +150,12 @@ static esp_err_t readChannel(ADS126X &adc, const AdcChannel &c, float *value)
     //if (err != ESP_OK) return err;
 
     // 2. one conversion on this channel's input pair
-    int32_t raw = 0;
+    float raw = 0;
     esp_err_t err = adc.readADC(c.pos_mux, c.neg_mux, &raw);
     if (err != ESP_OK) return err;
 
     // 3. convert code to volts
-    const double volts = adc.toVolts(raw, 3.3);
+    const double volts = raw;
 
     // 4. volts to channel's unit
     if (c.kind == AdcKind::Current_4_20mA)
@@ -203,19 +206,19 @@ extern "C" void app_main(void)
         return;
     }
 
-    /*Thermocouple instantiation*/
-    SlapDAQ_MAX31856 thermo;
+    // /*Thermocouple instantiation*/
+    // SlapDAQ_MAX31856 thermo;
 
-    //initialize thermocouple
-    bool thermo_ok = thermo.thermoInit();
-    if (thermo_ok)
-    {
-        ESP_LOGI(LOG_TAG, "Thermocouple has been initialized!");
-    }
-    else
-    {
-        ESP_LOGE(LOG_TAG, "Thermocouple init failed - retrying every %" PRIu32 " s", SENSOR_RETRY_LOOPS);
-    }
+    // //initialize thermocouple
+    // bool thermo_ok = thermo.thermoInit();
+    // if (thermo_ok)
+    // {
+    //     ESP_LOGI(LOG_TAG, "Thermocouple has been initialized!");
+    // }
+    // else
+    // {
+    //     ESP_LOGE(LOG_TAG, "Thermocouple init failed - retrying every %" PRIu32 " s", SENSOR_RETRY_LOOPS);
+    // }
     
     /*ADC instantiation*/
     ADS126X adc;
@@ -258,27 +261,25 @@ extern "C" void app_main(void)
 
         uint8_t digital_bits = read_all_pins();
 
-        /*------------- thermocouple -----------*/
-        if (!thermo_ok && (loop_count % SENSOR_RETRY_LOOPS == 0))
-        {
-            thermo_ok = thermo.thermoInit();
-            if (thermo_ok) ESP_LOGI(LOG_TAG, "Thermocouple initialized on rety");
-        }
+        // /*------------- thermocouple -----------*/
+        // if (!thermo_ok && (loop_count % SENSOR_RETRY_LOOPS == 0))
+        // {
+        //     thermo_ok = thermo.thermoInit();
+        //     if (thermo_ok) ESP_LOGI(LOG_TAG, "Thermocouple initialized on rety");
+        // }
         
-        float temp_c = NAN;
-        float cj_c = NAN;
-        if (thermo_ok)
-        {
-            temp_c = thermo.readThermocoupleTemperature();
-            cj_c = thermo.readCJTemperature();
+        // float temp_c = NAN;
+        // if (thermo_ok)
+        // {
+        //     temp_c = thermo.readThermocoupleTemperature();
 
-            uint8_t fault = 0;
-            if (thermo.readFault(&fault) == ESP_OK && fault != last_fault)
-            {
-                logThermoFault(fault);
-                last_fault = fault;
-            }
-        }
+        //     uint8_t fault = 0;
+        //     if (thermo.readFault(&fault) == ESP_OK && fault != last_fault)
+        //     {
+        //         logThermoFault(fault);
+        //         last_fault = fault;
+        //     }
+        // }
         
         /*------------- ADC -----------*/
         if (!adc_ok && (loop_count % SENSOR_RETRY_LOOPS == 0))
@@ -344,7 +345,7 @@ extern "C" void app_main(void)
         {
             SensorData measurements = {};
             measurements.digitalIOData = digital_bits;
-            measurements.tempData = temp_c;
+            //measurements.tempData = temp_c;
             for (size_t ch = 0; ch < ADC_NUM_CHANNELS; ch++)
             {
                 measurements.adcData[ch] = adc_value[ch];

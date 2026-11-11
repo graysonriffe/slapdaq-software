@@ -75,7 +75,9 @@ esp_err_t ADS126X::sendCommand(uint8_t command)
     alignas(4) uint8_t tx[2] = {command, 0x00};
     alignas(4) uint8_t rx[2] = {0, 0};
 
+    gpio_set_level((gpio_num_t)GPIO_CS_ADC, 0);
     TRY(spiTransfer(tx, rx, sizeof(tx)));
+    gpio_set_level((gpio_num_t)GPIO_CS_ADC, 1);
     return checkFrame(command, rx);
 }
 
@@ -145,14 +147,37 @@ esp_err_t ADS126X::readRegister(uint8_t reg, uint8_t *value)
 {
     if (reg >= ADS126X_REG_NUM) return ESP_ERR_INVALID_ARG;
 
-    alignas(4) uint8_t tx[3] = { (uint8_t)(ADS126X_RREG | reg), 0x00, 0x00 };
-    alignas(4) uint8_t rx[3] = { 0, 0, 0};
+    alignas(4) uint8_t tx[2] = { (uint8_t)(ADS126X_RREG | reg), 0x00 };
+    alignas(4) uint8_t rx[2] = { 0, 0};
 
+    gpio_set_level((gpio_num_t)GPIO_CS_ADC, 0);
     TRY(spiTransfer(tx, rx, sizeof(tx)));
+
+    gpio_set_direction((gpio_num_t)GPIO_SCLK, GPIO_MODE_OUTPUT);
+    gpio_set_direction((gpio_num_t)GPIO_SPI_MOSI, GPIO_MODE_OUTPUT);
+    gpio_set_level((gpio_num_t)GPIO_SPI_MOSI, 0);
+    gpio_set_direction((gpio_num_t)GPIO_SPI_MISO, GPIO_MODE_INPUT);
+
+    uint8_t output = 0;
+    
+    for (int i = 7; i >=0; i--)
+    {
+        gpio_set_level((gpio_num_t) GPIO_SCLK, 1);
+        esp_rom_delay_us(1);
+        output |= gpio_get_level((gpio_num_t) GPIO_SPI_MISO) << i;
+
+        gpio_set_level((gpio_num_t) GPIO_SCLK, 0);
+        esp_rom_delay_us(1);
+    }
+
+    gpio_set_level((gpio_num_t)GPIO_CS_ADC, 1);
+
+    SPI_Init();
+
     TRY(checkFrame(tx[0], rx));
 
-    regByte(reg) = rx[2];       //keeps shadow in sync with the chip
-    if (value) *value = rx[2];
+    regByte(reg) = output;       //keeps shadow in sync with the chip
+    if (value) *value = output;
     return ESP_OK;
 }
 
@@ -165,7 +190,9 @@ esp_err_t ADS126X::writeRegister(uint8_t reg)
     alignas(4) uint8_t tx[2] = { (uint8_t)(ADS126X_WREG | reg), regByte(reg) };
     alignas(4) uint8_t rx[2] = { 0, 0};
 
+    gpio_set_level((gpio_num_t)GPIO_CS_ADC, 0);
     TRY(spiTransfer(tx, rx, sizeof(tx)));
+    gpio_set_level((gpio_num_t)GPIO_CS_ADC, 1);
     return checkFrame(tx[0], rx);
 }
 
@@ -209,13 +236,13 @@ esp_err_t ADS126X::begin(void)
     }
 
     // append STATUS byte to conversion reads. 
-    REGISTER.MODE3.bit.STATENB = ADS126X_STATENB_STAT;
-    TRY(writeRegister(ADS126X_MODE3));
+    // REGISTER.MODE3.bit.STATENB = ADS126X_STATENB_STAT;
+    // TRY(writeRegister(ADS126X_MODE3));
 
     //Pulse conversions: start one conversion with current input mux to make sure 
     // there aren't any conversions from a previous channel
-    REGISTER.MODE1.bit.CONVRT = ADS126X_CONVRT_ONE_SHOT;
-    TRY(writeRegister(ADS126X_MODE1));
+    // REGISTER.MODE1.bit.CONVRT = ADS126X_CONVRT_ONE_SHOT;
+    // TRY(writeRegister(ADS126X_MODE1));
 
     //RESET flag is set after every flag. Clear it to check if the ADC reset unexpectly
     REGISTER.STATUS.bit.RESET = 0;
@@ -241,7 +268,7 @@ esp_err_t ADS126X::begin(void)
 }
 
 /***********Reading Conversions***********/
-esp_err_t ADS126X::readADC(uint8_t pos_mux, uint8_t neg_mux, int32_t *raw, uint32_t timeout_ms)
+esp_err_t ADS126X::readADC(uint8_t pos_mux, uint8_t neg_mux, float* raw, uint32_t timeout_ms)
 {
     if (!initialized_)                      return ESP_ERR_INVALID_STATE;
     if (raw == nullptr)                       return ESP_ERR_INVALID_ARG;
@@ -258,46 +285,21 @@ esp_err_t ADS126X::readADC(uint8_t pos_mux, uint8_t neg_mux, int32_t *raw, uint3
     // RDATA with the STATUS byte is 6 bytes
     //      DIN: 12h, arbitrary, 00h,   00h,        00h,        00h
     //      DOUT: FFh, echo,    STATUS, data MSB, data MID, data LSB        datasheet table 21
-    alignas(4) uint8_t tx[6] = { ADS126X_RDATA, 0x00, 0x00, 0x00, 0x00, 0x00};
-    alignas(4) uint8_t rx[6] = {};
+    alignas(4) uint8_t tx[5] = { ADS126X_RDATA, 0x00};
+    alignas(4) uint8_t rx[5] = {};
 
-
-    //2. clear any stale data from an earlier transfer
+    gpio_set_level((gpio_num_t)GPIO_CS_ADC, 0);
     TRY(spiTransfer(tx, rx, sizeof(tx)));
+    gpio_set_level((gpio_num_t)GPIO_CS_ADC, 1);
     TRY(checkFrame(ADS126X_RDATA, rx));
-    
-    // 3. Start ONE conversion (pulse mode)
-    //TRY(startADC());
-
-    // 4. Poll with RDATA until status byte    
-    const int64_t deadline_us = esp_timer_get_time() + (int64_t) timeout_ms * 1000;
-
-    for (uint8_t &b : rx) b = 0;
-    TRY(spiTransfer(tx, rx, sizeof(tx)));
-    TRY(checkFrame(ADS126X_RDATA, rx));
-
-    if (esp_timer_get_time() > deadline_us)
-        {
-            ESP_LOGE(ADC_TAG, "Timed out waiting for a conversion (is the clock running? is START pin held low?)");
-            return ESP_ERR_TIMEOUT;
-        }
 
     //5. Assemble the 24-bit two's complement result and sign-extend it to 32 bits
-    int32_t output = 0;
     
-    for (int i = 23; i >=0; i--)
-    {
-        gpio_set_level((gpio_num_t) GPIO_CS_ADC, 1);
-        esp_rom_delay_us(1);
-        output |= gpio_get_level((gpio_num_t) GPIO_SPI_MISO) << i;
+    uint32_t output = static_cast<uint32_t>(rx[2] << 16) | static_cast<uint32_t>(rx[3] << 8) | static_cast<uint32_t>(rx[4]);
 
-        gpio_set_level((gpio_num_t) GPIO_CS_ADC, 0);
-        esp_rom_delay_us(1);
-    }
-    
     int32_t data = static_cast<int32_t> (output<<8) >> 8;
     
-    *raw = ((float) data / 0x7FFFFF) * 5.1f;
+    *raw = ((float) data / 0x7FFFFF) * 3.3f;
     return ESP_OK;
 }
 

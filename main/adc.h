@@ -39,7 +39,7 @@ class ADS126X
 
 
         // Analog Read Functions
-        esp_err_t readADC(uint8_t pos_mux, uint8_t neg_mux, int32_t *raw, uint32_t timeout_ms = 2000);
+        esp_err_t readADC(uint8_t pos_mux, uint8_t neg_mux, float* raw, uint32_t timeout_ms = 2000);
 
         // code to volts
         double toVolts(int32_t raw, double vref_volts) const;
