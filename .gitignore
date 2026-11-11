@@ -1,5 +1,6 @@
 *.vscode/
 .devcontainer/
+.clangd
 
 # macOS
 .DS_Store
@@ -20,7 +21,6 @@
 *.log
 
 # Build artifacts and directories
-**/build/
 build/
 *.o
 *.a
