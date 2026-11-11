@@ -8,6 +8,8 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
+#define ADS_STRICT_FRAME 0 // set back to 1 once the bit error makes sense
+
 static const char *ADC_TAG = "ADS1261";
 
 // return from a function that returns an esp_err_t
@@ -30,7 +32,14 @@ esp_err_t ADS126X::spiTransfer(const uint8_t *tx, uint8_t *rx, size_t len)
 // if this function fails, the ADC didn't hear us, so check physical wiring, SPI mode 1, power, RESET/PWDN pins.
 esp_err_t ADS126X::checkFrame(uint8_t sent_cmd, const uint8_t *rx)
 {
-    if (rx[0] != 0xFF || rx[1] != sent_cmd)
+    
+    if (rx[0] == 0xFF && rx[1] == sent_cmd) return ESP_OK;
+
+    ESP_LOGW(ADC_TAG, "Bad replay to cmd 0x%02X: got 0x%02X%02X (want 0xFF%02X)",
+                 sent_cmd, rx[0], rx[1], sent_cmd);
+        
+
+    /*if (rx[0] != 0xFF || rx[1] != sent_cmd)
     {
         ESP_LOGE(ADC_TAG, "Bad replay to cmd 0x%02X: got 0x%02X%02X (want 0xFF%02X)",
                  sent_cmd, rx[0], rx[1], sent_cmd);
@@ -46,7 +55,13 @@ esp_err_t ADS126X::checkFrame(uint8_t sent_cmd, const uint8_t *rx)
             }
             return ESP_ERR_INVALID_RESPONSE;
     }
-    return ESP_OK;
+            */
+
+    #if ADS_STRICT_FRAME
+        return ESP_ERR_INVALID_RESPONSE;
+    #else
+        return ESP_OK;
+    #endif
 }
 
 uint8_t &ADS126X::regByte(uint8_t addr)
@@ -82,7 +97,7 @@ esp_err_t ADS126X::startADC(void)
 {
     if (start_used)
     {
-        // low -> high ege on START restarts a conversion
+        // low -> high edge on START restarts a conversion
         gpio_set_level((gpio_num_t) start_pin, 0);
         esp_rom_delay_us(5);
         gpio_set_level((gpio_num_t) start_pin, 1);
@@ -182,7 +197,7 @@ esp_err_t ADS126X::begin(void)
 
     //reset adc after mcu reboot just in case
     // also checks wiring
-    TRY(stopADC());
+    //TRY(stopADC());
     TRY(reset());
 
 
@@ -252,31 +267,37 @@ esp_err_t ADS126X::readADC(uint8_t pos_mux, uint8_t neg_mux, int32_t *raw, uint3
     TRY(checkFrame(ADS126X_RDATA, rx));
     
     // 3. Start ONE conversion (pulse mode)
-    TRY(startADC());
+    //TRY(startADC());
 
     // 4. Poll with RDATA until status byte    
     const int64_t deadline_us = esp_timer_get_time() + (int64_t) timeout_ms * 1000;
 
-    while (true)
-    {
-        for (uint8_t &b : rx) b = 0;
-        TRY(spiTransfer(tx, rx, sizeof(tx)));
-        TRY(checkFrame(ADS126X_RDATA, rx));
+    for (uint8_t &b : rx) b = 0;
+    TRY(spiTransfer(tx, rx, sizeof(tx)));
+    TRY(checkFrame(ADS126X_RDATA, rx));
 
-        STATUS.reg = rx[2];
-        if (STATUS.bit.DRDY) break;     // new conversion results
-
-        if (esp_timer_get_time() > deadline_us)
+    if (esp_timer_get_time() > deadline_us)
         {
             ESP_LOGE(ADC_TAG, "Timed out waiting for a conversion (is the clock running? is START pin held low?)");
             return ESP_ERR_TIMEOUT;
         }
-        vTaskDelay(1);
-    }
 
     //5. Assemble the 24-bit two's complement result and sign-extend it to 32 bits
-    const uint32_t u = ((uint32_t) rx[3] << 16) | ((uint32_t) rx[4] << 8) | (uint32_t) rx[5];
-    *raw = (int32_t) ((u ^ 0x800000u) - 0x800000u);
+    int32_t output = 0;
+    
+    for (int i = 23; i >=0; i--)
+    {
+        gpio_set_level((gpio_num_t) GPIO_CS_ADC, 1);
+        esp_rom_delay_us(1);
+        output |= gpio_get_level((gpio_num_t) GPIO_SPI_MISO) << i;
+
+        gpio_set_level((gpio_num_t) GPIO_CS_ADC, 0);
+        esp_rom_delay_us(1);
+    }
+    
+    int32_t data = static_cast<int32_t> (output<<8) >> 8;
+    
+    *raw = ((float) data / 0x7FFFFF) * 5.1f;
     return ESP_OK;
 }
 

@@ -18,10 +18,10 @@ esp_err_t SPI_Init(void)
     busconfig.sclk_io_num = GPIO_SCLK;
     busconfig.quadwp_io_num = -1;
     busconfig.quadhd_io_num = -1;
-    busconfig.max_transfer_sz = 4092;
+    busconfig.max_transfer_sz = 64;
 
     //Initialize the SPI bus (SPI2_HOST)
-    esp_err_t SPI_ret = spi_bus_initialize(SPI2_HOST, &busconfig, SPI_DMA_CH_AUTO);
+    esp_err_t SPI_ret = spi_bus_initialize(SPI2_HOST, &busconfig, SPI_DMA_DISABLED);
 
     if (SPI_ret != ESP_OK)
     {
@@ -67,6 +67,7 @@ esp_err_t SPI_Init(void)
     devconfig_adc.mode = 1;                    // required to interact with adc
     devconfig_adc.spics_io_num = GPIO_CS_ADC;
     devconfig_adc.queue_size = 3;  //double check this value
+    devconfig_adc.cs_ena_pretrans = 1;
 
     //Add device to the bus
     SPI_ret = spi_bus_add_device(SPI2_HOST, &devconfig_adc, &spi_adc_handle);
@@ -89,5 +90,14 @@ esp_err_t spi_transfer(spi_device_handle_t dev, const uint8_t *tx_data, uint8_t 
     transaction.length = len_bytes * 8; // because spi_tranaction_t length parameter is in bits
     transaction.tx_buffer = tx_data;
     transaction.rx_buffer = rx_data;
-    return spi_device_transmit(dev, &transaction);
+
+    
+    esp_err_t ret = spi_device_transmit(dev, &transaction);
+
+    // log raw bytes for debugging
+    ESP_LOG_BUFFER_HEX("SPI tx", tx_data, len_bytes);
+    if (rx_data) ESP_LOG_BUFFER_HEX("SPI rx", rx_data, len_bytes);
+
+
+    return ret;
 }

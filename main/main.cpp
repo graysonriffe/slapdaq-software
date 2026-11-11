@@ -127,7 +127,7 @@ static bool configureAdc(ADS126X &adc)
     // data rate, filter, reference,...
     if (err == ESP_OK) err = adc.setRate(ADS126X_DR_20);
     if (err == ESP_OK) err = adc.setFilter(ADS126X_FILTER_FIR);
-    if (err == ESP_OK) err = adc.setDelay(ADS126X_DELAY_50_US);
+    //if (err == ESP_OK) err = adc.setDelay(ADS126X_DELAY_50_US);
     if (err == ESP_OK) err = adc.disableInternalReference();
     
 
@@ -142,13 +142,13 @@ static bool configureAdc(ADS126X &adc)
 // measure one ADC channel and convert it to its respective units
 static esp_err_t readChannel(ADS126X &adc, const AdcChannel &c, float *value)
 {
-    // 1. this channel's PGA setting
-    esp_err_t err = adc.setPGA(c.pga_bypass, c.pga_gain);
-    if (err != ESP_OK) return err;
+    // 1. this channel's PGA setting (NOT USING GAIN)
+    //esp_err_t err = adc.setPGA(c.pga_bypass, c.pga_gain);
+    //if (err != ESP_OK) return err;
 
     // 2. one conversion on this channel's input pair
     int32_t raw = 0;
-    err = adc.readADC(c.pos_mux, c.neg_mux, &raw);
+    esp_err_t err = adc.readADC(c.pos_mux, c.neg_mux, &raw);
     if (err != ESP_OK) return err;
 
     // 3. convert code to volts
@@ -258,8 +258,6 @@ extern "C" void app_main(void)
 
         uint8_t digital_bits = read_all_pins();
 
-
-
         /*------------- thermocouple -----------*/
         if (!thermo_ok && (loop_count % SENSOR_RETRY_LOOPS == 0))
         {
@@ -268,9 +266,11 @@ extern "C" void app_main(void)
         }
         
         float temp_c = NAN;
+        float cj_c = NAN;
         if (thermo_ok)
         {
             temp_c = thermo.readThermocoupleTemperature();
+            cj_c = thermo.readCJTemperature();
 
             uint8_t fault = 0;
             if (thermo.readFault(&fault) == ESP_OK && fault != last_fault)
@@ -280,7 +280,6 @@ extern "C" void app_main(void)
             }
         }
         
-
         /*------------- ADC -----------*/
         if (!adc_ok && (loop_count % SENSOR_RETRY_LOOPS == 0))
         {
@@ -320,7 +319,10 @@ extern "C" void app_main(void)
         }
         
         // two summary lines per loop: DIO + thermocouple, then every ADC measurement
-        ESP_LOGI(LOG_TAG, "DIO 0x%02X | TC %.2f C", digital_bits, (double) temp_c);
+        //ESP_LOGI(LOG_TAG, "DIO 0x%02X | TC %.2f C (CJ %.2f C)", digital_bits, (double) temp_c, (double) cj_c); Original
+
+        ESP_LOGI(LOG_TAG, "DIO 0x%02X", digital_bits);
+
 
         char adc_line[256];
         int pos = 0;

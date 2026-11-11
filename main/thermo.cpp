@@ -47,7 +47,7 @@ bool SlapDAQ_MAX31856::thermoInit(void)
     const uint8_t want_cr0 = MAX31856_CR0_AUTOCONVERT | MAX31856_CR0_OCFAULT0;
     if (cr0 != want_cr0 || (cr1 & 0x0F) != MAX31856_TCTYPE_K)
     {
-        ESP_LOGE(THERMO_TAG, "Readback mismatch: CR0 0x%02X (want 0x%02X), CR1 0x%02X (want 0x%X)"
+        ESP_LOGW(THERMO_TAG, "Readback mismatch: CR0 0x%02X (want 0x%02X), CR1 0x%02X (want 0x%X)"
                 "Check CS pin, MISO, SPI mode, 3.3 V supply.",
                 cr0, want_cr0, cr1, (unsigned) MAX31856_TCTYPE_K);
         return false;
