@@ -49,6 +49,7 @@ esp_err_t SPI_Init(void)
     devconfig_thermo.mode = 1;  // MAX31856 works with CPHA = 1 which is SPI 1
     devconfig_thermo.spics_io_num = GPIO_CS_THERMO;
     devconfig_thermo.queue_size = 3; // how many transactions can be queued before time out ; relevant for asynchronous, may revisit in the future
+    devconfig_thermo.cs_ena_pretrans = 1;
 
     //Add device to the bus
     SPI_ret = spi_bus_add_device(SPI2_HOST, &devconfig_thermo, &spi_thermo_handle);

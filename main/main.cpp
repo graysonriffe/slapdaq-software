@@ -198,29 +198,26 @@ extern "C" void app_main(void)
        return;
     }
 
-    // /*Thermocouple instantiation*/
+    /*Thermocouple instantiation*/
     SlapDAQ_MAX31856 thermo;
 
-    // //initialize thermocouple
+    //initialize thermocouple
     bool thermo_ok = thermo.thermoInit();
-    if (thermo_ok)
+    if (!thermo_ok)
     {
-        ESP_LOGI(LOG_TAG, "Thermocouple has been initialized!");
-    }
-    else
-    {
-        ESP_LOGE(LOG_TAG, "Thermocouple init failed - retrying every %" PRIu32 " s", SENSOR_RETRY_LOOPS);
-    }
-    
-    /*ADC instantiation*/
-    ADS126X adc;
-
-    bool adc_ok = configureAdc(adc);
-    if (!adc_ok)
-    {
-        ESP_LOGE(LOG_TAG, "configureAdc() failed");
+        ESP_LOGE(LOG_TAG, "Thermocouple init failed");
         return;
     }
+    
+    // /*ADC instantiation*/
+    // ADS126X adc;
+
+    // bool adc_ok = configureAdc(adc);
+    // if (!adc_ok)
+    // {
+    //     ESP_LOGE(LOG_TAG, "configureAdc() failed");
+    //     return;
+    // }
 
     /******************************************************** */
     /*                MAIN LOOP                               */
@@ -230,7 +227,6 @@ extern "C" void app_main(void)
     // uint8_t last_fault = 0;
     uint32_t loop_count = 0;
     TickType_t lastWake = xTaskGetTickCount();
-
 
     while (true)
     {
@@ -256,47 +252,28 @@ extern "C" void app_main(void)
 
         uint8_t digital_bits = read_all_pins();
 
-        // /*------------- thermocouple -----------*/
-        if (!thermo_ok && (loop_count % SENSOR_RETRY_LOOPS == 0))
-        {
-            thermo_ok = thermo.thermoInit();
-            if (thermo_ok) ESP_LOGI(LOG_TAG, "Thermocouple initialized on rety");
-        }
-        
+        /*------------- thermocouple -----------*/
         float temp_c = NAN;
-        if (thermo_ok)
-        {
-            temp_c = thermo.readThermocoupleTemperature();
+        temp_c = thermo.readThermocoupleTemperature();
 
-            // uint8_t fault = 0;
-            // if (thermo.readFault(&fault) == ESP_OK && fault != last_fault)
-            // {
-                // logThermoFault(fault);
-                // last_fault = fault;
-            // }
-        }
-        
         /*------------- ADC -----------*/
         // scan every channel in the table with their respective mux pair
-        float adc_value[ADC_NUM_CHANNELS];
-        for (size_t ch = 0; ch < ADC_NUM_CHANNELS; ch++) adc_value[ch] = NAN;   // NaN = no reading
+        // float adc_value[ADC_NUM_CHANNELS];
+        // for (size_t ch = 0; ch < ADC_NUM_CHANNELS; ch++) adc_value[ch] = NAN;   // NaN = no reading
 
-        if (adc_ok)
-        {
-            for (size_t ch = 0; ch < ADC_NUM_CHANNELS; ch++)
-            {
-                ret = readChannel(adc, ADC_CHANNELS[ch], &adc_value[ch]);
-                if (ret != ESP_OK)
-                {
-                    // failure here is either the spi link or the chip
-                    ESP_LOGE(LOG_TAG, "reading %s failed: %s - will re-intialize the ADC",
-                             ADC_CHANNELS[ch].name, esp_err_to_name(ret));
-                    for (size_t index = 0; index < ADC_NUM_CHANNELS; index++) adc_value[index] = NAN;
-                    adc_ok = false;
-                    break;
-                }
-            }
-        }
+        // for (size_t ch = 0; ch < ADC_NUM_CHANNELS; ch++)
+        // {
+        //     ret = readChannel(adc, ADC_CHANNELS[ch], &adc_value[ch]);
+        //     if (ret != ESP_OK)
+        //     {
+        //         // failure here is either the spi link or the chip
+        //         ESP_LOGE(LOG_TAG, "reading %s failed: %s - will re-intialize the ADC",
+        //                     ADC_CHANNELS[ch].name, esp_err_to_name(ret));
+        //         for (size_t index = 0; index < ADC_NUM_CHANNELS; index++) adc_value[index] = NAN;
+        //         adc_ok = false;
+        //         break;
+        //     }
+        // }
         
         // two summary lines per loop: DIO + thermocouple, then every ADC measurement
         ESP_LOGI(LOG_TAG, "DIO 0x%02X | TC %.2f C", digital_bits, (double) temp_c);
@@ -304,34 +281,33 @@ extern "C" void app_main(void)
         //ESP_LOGI(LOG_TAG, "DIO 0x%02X", digital_bits);
 
 
-        char adc_line[256];
-        int pos = 0;
-        for (size_t ch = 0; ch < ADC_NUM_CHANNELS; ch++)
-        {
-            const ADCChannel &c = ADC_CHANNELS[ch];
-            const bool is_current = (c.kind == ADCChannelKind::Current);
-            const float v = adc_value[ch];
+        // char adc_line[256];
+        // int pos = 0;
+        // for (size_t ch = 0; ch < ADC_NUM_CHANNELS; ch++)
+        // {
+        //     const ADCChannel &c = ADC_CHANNELS[ch];
+        //     const bool is_current = (c.kind == ADCChannelKind::Current);
+        //     const float v = adc_value[ch];
 
-            int n = snprintf(adc_line + pos, sizeof(adc_line) - pos, "%s %s %.4f %s",
-                             (ch == 0) ? "" : " |", c.name, (double) v, is_current ? "mA" : "V");
-            if (n < 0 || pos + n >= (int) sizeof(adc_line)) break;
-            pos += n;
-        }
-        ESP_LOGI(LOG_TAG, "ADC%s%s", adc_line, adc_ok ? "" : " [ADC offline]");
+        //     int n = snprintf(adc_line + pos, sizeof(adc_line) - pos, "%s %s %.4f %s",
+        //                      (ch == 0) ? "" : " |", c.name, (double) v, is_current ? "mA" : "V");
+        //     if (n < 0 || pos + n >= (int) sizeof(adc_line)) break;
+        //     pos += n;
+        // }
+        // ESP_LOGI(LOG_TAG, "ADC%s%s", adc_line, adc_ok ? "" : " [ADC offline]");
 
         /*------------- send measurements to PC -----------*/
-        //if (connected)
-        if(1)
-        {
-            SensorData measurements = {};
-            measurements.digitalIOData = digital_bits;
-            measurements.tempData = temp_c;
-            for (size_t ch = 0; ch < ADC_NUM_CHANNELS; ch++)
-            {
-                measurements.adcData[ch] = adc_value[ch];
-            }
-            sendStructOverWifi(measurements);
-        }
+        // if (connected)
+        // {
+        //     SensorData measurements = {};
+        //     measurements.digitalIOData = digital_bits;
+        //     //measurements.tempData = temp_c;
+        //     for (size_t ch = 0; ch < ADC_NUM_CHANNELS; ch++)
+        //     {
+        //         measurements.adcData[ch] = adc_value[ch];
+        //     }
+        //     sendStructOverWifi(measurements);
+        // }
 
         if (xTaskDelayUntil(&lastWake, LOOP_PERIOD) == pdFALSE)
         {

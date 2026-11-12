@@ -5,8 +5,8 @@
 #include "driver/gpio.h"
 
 /*SPI Variables*/
-#define GPIO_SPI_MOSI 11      // SPI_D Original is 11
-#define GPIO_SPI_MISO 13      // SPI_Q Original is 13
+#define GPIO_SPI_MOSI 13      // SPI_D Original is 11              SWTICHED
+#define GPIO_SPI_MISO 11      // SPI_Q Original is 13
 #define GPIO_SCLK 12
 #define GPIO_CS_THERMO 8
 #define GPIO_CS_ADC 10
