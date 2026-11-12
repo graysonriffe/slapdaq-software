@@ -72,24 +72,24 @@ static constexpr AdcChannel ADC_CHANNELS[] =
 static const char* LOG_TAG = "MAIN";
 
 // Function that displays the thermocouple faults to the serial monitor for debugging
-static void logThermoFault(uint8_t fault)
-{
-    if (fault == 0)
-    {
-        ESP_LOGI(LOG_TAG, "Thermocouple faults cleared");
-        return;
-    }
+// static void logThermoFault(uint8_t fault)
+// {
+//     if (fault == 0)
+//     {
+//         ESP_LOGI(LOG_TAG, "Thermocouple faults cleared");
+//         return;
+//     }
 
-    ESP_LOGW(LOG_TAG, "Thermocouple fault 0x%02X:%s%s%s%s%s%s%s%s", fault,
-             (fault & MAX31856_FAULT_CJRANGE) ? " CJ-out-of-range" : "",
-             (fault & MAX31856_FAULT_TCRANGE) ? " TC-out-of-range" : "",
-             (fault & MAX31856_FAULT_CJHIGH) ? " CJ-high" : "",
-             (fault & MAX31856_FAULT_CJLOW) ? " CJ-low" : "",
-             (fault & MAX31856_FAULT_TCHIGH) ? " TC-high" : "",
-             (fault & MAX31856_FAULT_TCLOW) ? " TC-low" : "",
-             (fault & MAX31856_FAULT_OVUV) ? " over/under-voltage" : "",
-             (fault & MAX31856_FAULT_OPEN) ? " OPEN-circuit" : "");
-}
+//     ESP_LOGW(LOG_TAG, "Thermocouple fault 0x%02X:%s%s%s%s%s%s%s%s", fault,
+//              (fault & MAX31856_FAULT_CJRANGE) ? " CJ-out-of-range" : "",
+//              (fault & MAX31856_FAULT_TCRANGE) ? " TC-out-of-range" : "",
+//              (fault & MAX31856_FAULT_CJHIGH) ? " CJ-high" : "",
+//              (fault & MAX31856_FAULT_CJLOW) ? " CJ-low" : "",
+//              (fault & MAX31856_FAULT_TCHIGH) ? " TC-high" : "",
+//              (fault & MAX31856_FAULT_TCLOW) ? " TC-low" : "",
+//              (fault & MAX31856_FAULT_OVUV) ? " over/under-voltage" : "",
+//              (fault & MAX31856_FAULT_OPEN) ? " OPEN-circuit" : "");
+// }
 
 static void handleHostCommand(const uint8_t *pkt)
 {
@@ -202,23 +202,23 @@ extern "C" void app_main(void)
     //Initialize wifi
     if (!wifi_initialize())
     {
-        ESP_LOGE(LOG_TAG, "Wifi could not be initialized");
-        return;
+       ESP_LOGE(LOG_TAG, "Wifi could not be initialized");
+       return;
     }
 
     // /*Thermocouple instantiation*/
-    // SlapDAQ_MAX31856 thermo;
+    SlapDAQ_MAX31856 thermo;
 
     // //initialize thermocouple
-    // bool thermo_ok = thermo.thermoInit();
-    // if (thermo_ok)
-    // {
-    //     ESP_LOGI(LOG_TAG, "Thermocouple has been initialized!");
-    // }
-    // else
-    // {
-    //     ESP_LOGE(LOG_TAG, "Thermocouple init failed - retrying every %" PRIu32 " s", SENSOR_RETRY_LOOPS);
-    // }
+    bool thermo_ok = thermo.thermoInit();
+    if (thermo_ok)
+    {
+        ESP_LOGI(LOG_TAG, "Thermocouple has been initialized!");
+    }
+    else
+    {
+        ESP_LOGE(LOG_TAG, "Thermocouple init failed - retrying every %" PRIu32 " s", SENSOR_RETRY_LOOPS);
+    }
     
     /*ADC instantiation*/
     ADS126X adc;
@@ -234,7 +234,7 @@ extern "C" void app_main(void)
     /******************************************************** */
 
     bool was_connected = false;
-    uint8_t last_fault = 0;
+    // uint8_t last_fault = 0;
     uint32_t loop_count = 0;
     TickType_t lastWake = xTaskGetTickCount();
 
@@ -243,7 +243,7 @@ extern "C" void app_main(void)
     {
         loop_count++;
 
-        /*------------- host connection + commands -----------*/
+        // /*------------- host connection + commands -----------*/
         bool connected = wifi_client_connected(0);
 
         if (connected != was_connected)
@@ -262,40 +262,30 @@ extern "C" void app_main(void)
         uint8_t digital_bits = read_all_pins();
 
         // /*------------- thermocouple -----------*/
-        // if (!thermo_ok && (loop_count % SENSOR_RETRY_LOOPS == 0))
-        // {
-        //     thermo_ok = thermo.thermoInit();
-        //     if (thermo_ok) ESP_LOGI(LOG_TAG, "Thermocouple initialized on rety");
-        // }
+        if (!thermo_ok && (loop_count % SENSOR_RETRY_LOOPS == 0))
+        {
+            thermo_ok = thermo.thermoInit();
+            if (thermo_ok) ESP_LOGI(LOG_TAG, "Thermocouple initialized on rety");
+        }
         
-        // float temp_c = NAN;
-        // if (thermo_ok)
-        // {
-        //     temp_c = thermo.readThermocoupleTemperature();
+        float temp_c = NAN;
+        if (thermo_ok)
+        {
+            temp_c = thermo.readThermocoupleTemperature();
 
-        //     uint8_t fault = 0;
-        //     if (thermo.readFault(&fault) == ESP_OK && fault != last_fault)
-        //     {
-        //         logThermoFault(fault);
-        //         last_fault = fault;
-        //     }
-        // }
+            // uint8_t fault = 0;
+            // if (thermo.readFault(&fault) == ESP_OK && fault != last_fault)
+            // {
+                // logThermoFault(fault);
+                // last_fault = fault;
+            // }
+        }
         
         /*------------- ADC -----------*/
         if (!adc_ok && (loop_count % SENSOR_RETRY_LOOPS == 0))
         {
             adc_ok = configureAdc(adc);
             if (adc_ok) ESP_LOGI(LOG_TAG, "ADC initialized on retry");
-        }
-
-        if (adc_ok)
-        {
-            bool adc_was_reset = false;
-            if (adc.checkResetBit(&adc_was_reset) == ESP_OK && adc_was_reset)
-            {
-                ESP_LOGW(LOG_TAG, "ADC reset unexpectedly - re-initializing");
-                adc_ok = configureAdc(adc);
-            }
         }
 
         // scan every channel in the table with their respective mux pair
@@ -320,9 +310,9 @@ extern "C" void app_main(void)
         }
         
         // two summary lines per loop: DIO + thermocouple, then every ADC measurement
-        //ESP_LOGI(LOG_TAG, "DIO 0x%02X | TC %.2f C (CJ %.2f C)", digital_bits, (double) temp_c, (double) cj_c); Original
+        ESP_LOGI(LOG_TAG, "DIO 0x%02X | TC %.2f C", digital_bits, (double) temp_c);
 
-        ESP_LOGI(LOG_TAG, "DIO 0x%02X", digital_bits);
+        
 
 
         char adc_line[256];
@@ -341,11 +331,12 @@ extern "C" void app_main(void)
         ESP_LOGI(LOG_TAG, "ADC%s%s", adc_line, adc_ok ? "" : " [ADC offline]");
 
         /*------------- send measurements to PC -----------*/
-        if (connected)
+        //if (connected)
+        if(1)
         {
             SensorData measurements = {};
             measurements.digitalIOData = digital_bits;
-            //measurements.tempData = temp_c;
+            measurements.tempData = temp_c;
             for (size_t ch = 0; ch < ADC_NUM_CHANNELS; ch++)
             {
                 measurements.adcData[ch] = adc_value[ch];

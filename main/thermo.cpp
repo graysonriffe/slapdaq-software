@@ -16,11 +16,15 @@ bool SlapDAQ_MAX31856::thermoInit(void)
     esp_err_t err = ESP_OK;
 
     //assert on any fault
-    if (err == ESP_OK) err = writeRegister8(MAX31856_MASK_REG, 0x00);   
+    // if (err == ESP_OK) err = writeRegister8(MAX31856_MASK_REG, 0x00);   
 
     // enable open circuit fault detection
-    if (err == ESP_OK) err = writeRegister8(MAX31856_CR0_REG, MAX31856_CR0_OCFAULT0);
+    // if (err == ESP_OK) err = writeRegister8(MAX31856_CR0_REG, MAX31856_CR0_OCFAULT0);
     
+    // reset thermocouple
+    if (err == ESP_OK) err = writeRegister8(MAX31856_CR0_REG, 0x00);
+
+
     // set cold junction temperature offset to zero
     if (err == ESP_OK) err = writeRegister8(MAX31856_CJTO_REG, 0x00);
 
@@ -44,7 +48,8 @@ bool SlapDAQ_MAX31856::thermoInit(void)
         return false;
     }
 
-    const uint8_t want_cr0 = MAX31856_CR0_AUTOCONVERT | MAX31856_CR0_OCFAULT0;
+    // const uint8_t want_cr0 = MAX31856_CR0_AUTOCONVERT | MAX31856_CR0_OCFAULT0;
+    const uint8_t want_cr0 = MAX31856_CR0_AUTOCONVERT;
     if (cr0 != want_cr0 || (cr1 & 0x0F) != MAX31856_TCTYPE_K)
     {
         ESP_LOGW(THERMO_TAG, "Readback mismatch: CR0 0x%02X (want 0x%02X), CR1 0x%02X (want 0x%X)"
