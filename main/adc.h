@@ -34,6 +34,7 @@ class ADS126X
         // General ADC Commands
         esp_err_t noOperation(void);
         esp_err_t reset(void);
+        esp_err_t sfocal(void);
         esp_err_t startADC(void);
         esp_err_t stopADC(void);
 

@@ -1,15 +1,14 @@
 
 /*Logging includes*/
 #define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
-#include "esp_log.h"
+#include <esp_log.h>
+#include <esp_timer.h>
 
 /*Standard Library*/
-#include <stdio.h>
-#include <inttypes.h>
 #include <math.h>
 
 /*FreeRTOS includes*/
-#include "freertos/FreeRTOS.h"
+#include <freertos/FreeRTOS.h>
 
 /*SPI Includes*/
 #include "spi_DAQ.h"
@@ -31,42 +30,37 @@
 
 /*Global Variables*/
 
-// retry sensor init (loops = seconds)
-static const uint32_t SENSOR_RETRY_LOOPS = 5;
+static const TickType_t LOOP_PERIOD = pdMS_TO_TICKS(100);
 
-static const TickType_t LOOP_PERIOD = pdMS_TO_TICKS(1000);
-
-enum class AdcKind : uint8_t
+enum class ADCChannelKind : uint8_t
 {
     Voltage,
-    Current_4_20mA,
+    Current,
 };
 
-struct AdcChannel
+struct ADCChannel
 {
     const char *name;
     uint8_t pos_mux;
     uint8_t neg_mux;
     bool pga_bypass;
     uint8_t pga_gain;
-    AdcKind kind;
+    ADCChannelKind kind;
     float shunt_ohms;
 };
 
 static constexpr float SHUNT_OHMS = 1.0f;
 
-static constexpr AdcChannel ADC_CHANNELS[] =
+static constexpr ADCChannel ADC_CHANNELS[] =
 {
-    // name        pos                 neg         bypass      gain               kind          shunt
-    { "AV1", ADS126X_MUXP_AIN5, ADS126X_MUXN_AINCOM, true, ADS126X_PGA_GAIN_1, AdcKind::Voltage,              0.0f},
-    { "AV2", ADS126X_MUXP_AIN4, ADS126X_MUXN_AINCOM, true, ADS126X_PGA_GAIN_1, AdcKind::Voltage,              0.0f},
-    { "AV3", ADS126X_MUXP_AIN3, ADS126X_MUXN_AINCOM, true, ADS126X_PGA_GAIN_1, AdcKind::Voltage,              0.0f},
-    { "AV4", ADS126X_MUXP_AIN2, ADS126X_MUXN_AINCOM, true, ADS126X_PGA_GAIN_1, AdcKind::Voltage,              0.0f},
-
-    { "DV", ADS126X_MUXP_AIN6, ADS126X_MUXN_AIN7, true, ADS126X_PGA_GAIN_1, AdcKind::Voltage,                 0.0f},
-
-    { "AC1", ADS126X_MUXP_AIN9, ADS126X_MUXN_AINCOM, true, ADS126X_PGA_GAIN_1, AdcKind::Current_4_20mA,       SHUNT_OHMS},
-    { "AC2", ADS126X_MUXP_AIN8, ADS126X_MUXN_AINCOM, true, ADS126X_PGA_GAIN_1, AdcKind::Current_4_20mA,       SHUNT_OHMS},
+    // name  pos                neg                  bypass gain               kind                     shunt
+    { "AV1", ADS126X_MUXP_AIN5, ADS126X_MUXN_AINCOM, true, ADS126X_PGA_GAIN_1, ADCChannelKind::Voltage, 0.0f      },
+    { "AV2", ADS126X_MUXP_AIN4, ADS126X_MUXN_AINCOM, true, ADS126X_PGA_GAIN_1, ADCChannelKind::Voltage, 0.0f      },
+    { "AV3", ADS126X_MUXP_AIN3, ADS126X_MUXN_AINCOM, true, ADS126X_PGA_GAIN_1, ADCChannelKind::Voltage, 0.0f      },
+    { "AV4", ADS126X_MUXP_AIN2, ADS126X_MUXN_AINCOM, true, ADS126X_PGA_GAIN_1, ADCChannelKind::Voltage, 0.0f      },
+    { "DV", ADS126X_MUXP_AIN6,  ADS126X_MUXN_AIN7,   true, ADS126X_PGA_GAIN_1, ADCChannelKind::Voltage, 0.0f      },
+    { "AC1", ADS126X_MUXP_AIN9, ADS126X_MUXN_AINCOM, true, ADS126X_PGA_GAIN_1, ADCChannelKind::Current, SHUNT_OHMS},
+    { "AC2", ADS126X_MUXP_AIN8, ADS126X_MUXN_AINCOM, true, ADS126X_PGA_GAIN_1, ADCChannelKind::Current, SHUNT_OHMS},
 };
 
 static const char* LOG_TAG = "MAIN";
@@ -126,14 +120,12 @@ static bool configureAdc(ADS126X &adc)
     // configure the default and desired settings here such as
     // data rate, filter, reference,...
     if (err == ESP_OK) err = adc.setRate(ADS126X_DR_40000);
-    adc.disablePGA();
-    adc.setReference(ADS126X_RMUXN_INTRN_AIN1, ADS126X_RMUXP_INTRN_AIN0);
-    // if (err == ESP_OK) err = adc.setFilter(ADS126X_FILTER_FIR);
-    //if (err == ESP_OK) err = adc.setDelay(ADS126X_DELAY_50_US);
-    // if (err == ESP_OK) err = adc.disableInternalReference();
+    if (err == ESP_OK) err = adc.disablePGA();
+    if (err == ESP_OK) err = adc.setReference(ADS126X_RMUXN_INTRN_AIN1, ADS126X_RMUXP_INTRN_AIN0);
+    if (err == ESP_OK) err = adc.setFilter(ADS126X_FILTER_SINC1);
+    if (err == ESP_OK) err = adc.startADC();
+    if (err == ESP_OK) err = adc.sfocal();
     
-    adc.startADC();
-
     if (err != ESP_OK)
     {
         ESP_LOGE(LOG_TAG, "ADC setup failed: %s", esp_err_to_name(err));
@@ -143,7 +135,7 @@ static bool configureAdc(ADS126X &adc)
 }
 
 // measure one ADC channel and convert it to its respective units
-static esp_err_t readChannel(ADS126X &adc, const AdcChannel &c, float *value)
+static esp_err_t readChannel(ADS126X &adc, const ADCChannel &c, float *value)
 {
     // 1. this channel's PGA setting (NOT USING GAIN)
     //esp_err_t err = adc.setPGA(c.pga_bypass, c.pga_gain);
@@ -158,7 +150,7 @@ static esp_err_t readChannel(ADS126X &adc, const AdcChannel &c, float *value)
     const double volts = raw;
 
     // 4. volts to channel's unit
-    if (c.kind == AdcKind::Current_4_20mA)
+    if (c.kind == ADCChannelKind::Current)
     {
         *value = (float) (volts / (double) c.shunt_ohms * 1000.0);
     }
@@ -226,7 +218,8 @@ extern "C" void app_main(void)
     bool adc_ok = configureAdc(adc);
     if (!adc_ok)
     {
-        ESP_LOGE(LOG_TAG, "ADC begin() failed - retrying every %" PRIu32 " s", SENSOR_RETRY_LOOPS);
+        ESP_LOGE(LOG_TAG, "configureAdc() failed");
+        return;
     }
 
     /******************************************************** */
@@ -243,7 +236,9 @@ extern "C" void app_main(void)
     {
         loop_count++;
 
-        // /*------------- host connection + commands -----------*/
+        int64_t startTime = esp_timer_get_time();
+
+        /*------------- host connection + commands -----------*/
         bool connected = wifi_client_connected(0);
 
         if (connected != was_connected)
@@ -282,12 +277,6 @@ extern "C" void app_main(void)
         }
         
         /*------------- ADC -----------*/
-        if (!adc_ok && (loop_count % SENSOR_RETRY_LOOPS == 0))
-        {
-            adc_ok = configureAdc(adc);
-            if (adc_ok) ESP_LOGI(LOG_TAG, "ADC initialized on retry");
-        }
-
         // scan every channel in the table with their respective mux pair
         float adc_value[ADC_NUM_CHANNELS];
         for (size_t ch = 0; ch < ADC_NUM_CHANNELS; ch++) adc_value[ch] = NAN;   // NaN = no reading
@@ -312,15 +301,15 @@ extern "C" void app_main(void)
         // two summary lines per loop: DIO + thermocouple, then every ADC measurement
         ESP_LOGI(LOG_TAG, "DIO 0x%02X | TC %.2f C", digital_bits, (double) temp_c);
 
-        
+        //ESP_LOGI(LOG_TAG, "DIO 0x%02X", digital_bits);
 
 
         char adc_line[256];
         int pos = 0;
         for (size_t ch = 0; ch < ADC_NUM_CHANNELS; ch++)
         {
-            const AdcChannel &c = ADC_CHANNELS[ch];
-            const bool is_current = (c.kind == AdcKind::Current_4_20mA);
+            const ADCChannel &c = ADC_CHANNELS[ch];
+            const bool is_current = (c.kind == ADCChannelKind::Current);
             const float v = adc_value[ch];
 
             int n = snprintf(adc_line + pos, sizeof(adc_line) - pos, "%s %s %.4f %s",
@@ -348,6 +337,10 @@ extern "C" void app_main(void)
         {
             lastWake = xTaskGetTickCount();
         }
+
+        int64_t loopDuration = esp_timer_get_time() - startTime;
+
+        ESP_LOGI(LOG_TAG, "Elapsed time: %lld", loopDuration);
     }
 }
 

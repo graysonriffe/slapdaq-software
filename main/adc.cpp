@@ -95,6 +95,11 @@ esp_err_t ADS126X::reset(void)
     return readAllRegisters();
 }
 
+esp_err_t ADS126X::sfocal(void)
+{
+    return sendCommand(ADS126X_SFOCAL);
+}
+
 esp_err_t ADS126X::startADC(void)
 {
     if (start_used)
@@ -281,6 +286,8 @@ esp_err_t ADS126X::readADC(uint8_t pos_mux, uint8_t neg_mux, float* raw, uint32_
         REGISTER.INPMUX.bit.MUXN = neg_mux;
         TRY(writeRegister(ADS126X_INPMUX));
     }
+
+    esp_rom_delay_us(150);
 
     // RDATA with the STATUS byte is 6 bytes
     //      DIN: 12h, arbitrary, 00h,   00h,        00h,        00h
