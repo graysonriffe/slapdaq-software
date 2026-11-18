@@ -1,4 +1,3 @@
-
 /*Logging includes*/
 #define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
 #include <esp_log.h>
@@ -57,13 +56,13 @@ struct ADCChannel
 static constexpr ADCChannel ADC_CHANNELS[] =
 {
     // name  pos                neg                  kind
-    { "AV1", ADS126X_MUXP_AIN5, ADS126X_MUXN_AINCOM, ADCChannelKind::Voltage},
-    { "AV2", ADS126X_MUXP_AIN4, ADS126X_MUXN_AINCOM, ADCChannelKind::Voltage},
-    { "AV3", ADS126X_MUXP_AIN3, ADS126X_MUXN_AINCOM, ADCChannelKind::Voltage},
-    { "AV4", ADS126X_MUXP_AIN2, ADS126X_MUXN_AINCOM, ADCChannelKind::Voltage},
-    { "DV",  ADS126X_MUXP_AIN6,  ADS126X_MUXN_AIN7,  ADCChannelKind::Voltage},
-    { "AC1", ADS126X_MUXP_AIN9, ADS126X_MUXN_AINCOM, ADCChannelKind::Current},
-    { "AC2", ADS126X_MUXP_AIN8, ADS126X_MUXN_AINCOM, ADCChannelKind::Current}
+    { "AV1", ADS126X_MUXP_AIN5, ADS126X_MUXN_AINCOM, ADCChannelKind::Voltage },
+    { "AV2", ADS126X_MUXP_AIN4, ADS126X_MUXN_AINCOM, ADCChannelKind::Voltage },
+    { "AV3", ADS126X_MUXP_AIN3, ADS126X_MUXN_AINCOM, ADCChannelKind::Voltage },
+    { "AV4", ADS126X_MUXP_AIN2, ADS126X_MUXN_AINCOM, ADCChannelKind::Voltage },
+    { "DV",  ADS126X_MUXP_AIN6,  ADS126X_MUXN_AIN7,  ADCChannelKind::Voltage },
+    { "AC1", ADS126X_MUXP_AIN9, ADS126X_MUXN_AINCOM, ADCChannelKind::Current },
+    { "AC2", ADS126X_MUXP_AIN8, ADS126X_MUXN_AINCOM, ADCChannelKind::Current }
 };
 
 static const char* LOG_TAG = "MAIN";
@@ -189,7 +188,6 @@ extern "C" void app_main(void)
         ESP_LOGE(LOG_TAG, "Thermocouple init failed");
         return;
     }
-    
 
     /******************************************************** */
     /*                MAIN LOOP                               */

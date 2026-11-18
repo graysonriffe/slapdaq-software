@@ -1,6 +1,12 @@
 //necessary imports
 #include "wifi.h"
 
+#include "esp_log.h"
+#include "nvs_flash.h"
+#include "esp_wifi.h"
+#include "esp_netif.h"
+#include "lwip/sockets.h"
+
 static const char* WIFI_TAG = "wifi";
 
 static int s_listenFD = -1;
@@ -105,6 +111,11 @@ bool wifi_initialize(void) {
 
     s_listenFD = socketFD;
     ESP_LOGI(WIFI_TAG, "Listening on port 15000");
+
+    // Initialize Wi-Fi LED
+    gpio_reset_pin(WIFI_LED_PIN);
+    gpio_set_direction(WIFI_LED_PIN, GPIO_MODE_OUTPUT);
+
     return true;
 }
 
@@ -113,6 +124,8 @@ bool wifi_wait_for_connection()
     if (s_listenFD < 0) return false;
 
     ESP_LOGI(WIFI_TAG, "Waiting for connection...");
+
+    gpio_set_level(WIFI_LED_PIN, 0);
 
     sockaddr_in clientAddress = {};
     socklen_t len = sizeof(clientAddress);
@@ -128,6 +141,8 @@ bool wifi_wait_for_connection()
 
         s_clientFD = fd;
         ESP_LOGI(WIFI_TAG, "Got connection from %s. Sending data", inet_ntoa(clientAddress.sin_addr));
+
+        gpio_set_level(WIFI_LED_PIN, 1); // Turn Wi-Fi LED on
     }
     else
     {

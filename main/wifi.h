@@ -1,19 +1,14 @@
 #pragma once
 
-//Necessary imports
-#include <string.h>
-#include <errno.h>
+#include <cstdint>
 
-#include "esp_log.h"
-#include "esp_event.h"
-#include "nvs_flash.h"
-#include "esp_wifi.h"
-#include "esp_netif.h"
-#include "lwip/sockets.h"
+#include "driver/gpio.h"
 
 #define WIFI_PASSWORD   "dummyPassword"
 #define WIFI_SSID       "Main SLAPDAQ"
 #define WIFI_TCP_PORT   15000
+
+#define WIFI_LED_PIN    GPIO_NUM_1
 
 /*Function Declaration*/
 bool wifi_initialize(void);
