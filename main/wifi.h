@@ -19,7 +19,7 @@
 bool wifi_initialize(void);
 
 // true while a host is connected
-bool wifi_client_connected(int timeout_ms);
+bool wifi_wait_for_connection();
 
 // sends all 'len' bytes (handles partial reads) | closes the client and returns false if there is an error
 bool wifi_send(const char *data, size_t len);

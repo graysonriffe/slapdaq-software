@@ -25,8 +25,8 @@ bool SlapDAQ_MAX31856::thermoInit(void)
     if (err == ESP_OK) err = writeRegister8(MAX31856_CR0_REG, 0x00);
 
 
-    // set cold junction temperature offset to -6 deg C
-    if (err == ESP_OK) err = writeRegister8(MAX31856_CJTO_REG, 0xA0);
+    // set cold junction temperature offset to -3 deg C
+    if (err == ESP_OK) err = writeRegister8(MAX31856_CJTO_REG, 0xD0);
 
     // set Type K
     if (err == ESP_OK) err = setThermocoupleType(MAX31856_TCTYPE_K);

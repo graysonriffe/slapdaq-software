@@ -78,7 +78,7 @@ esp_err_t ADS126X::sendCommand(uint8_t command)
     gpio_set_level((gpio_num_t)GPIO_CS_ADC, 0);
     TRY(spiTransfer(tx, rx, sizeof(tx)));
     gpio_set_level((gpio_num_t)GPIO_CS_ADC, 1);
-    return checkFrame(command, rx);
+    return ESP_OK; //checkFrame(command, rx);
 }
 
 esp_err_t ADS126X::noOperation()
@@ -179,7 +179,7 @@ esp_err_t ADS126X::readRegister(uint8_t reg, uint8_t *value)
 
     SPI_Init();
 
-    TRY(checkFrame(tx[0], rx));
+    //TRY(checkFrame(tx[0], rx));
 
     regByte(reg) = output;       //keeps shadow in sync with the chip
     if (value) *value = output;
@@ -198,7 +198,7 @@ esp_err_t ADS126X::writeRegister(uint8_t reg)
     gpio_set_level((gpio_num_t)GPIO_CS_ADC, 0);
     TRY(spiTransfer(tx, rx, sizeof(tx)));
     gpio_set_level((gpio_num_t)GPIO_CS_ADC, 1);
-    return checkFrame(tx[0], rx);
+    return ESP_OK; //checkFrame(tx[0], rx);
 }
 
 esp_err_t ADS126X::readAllRegisters(void)
@@ -298,7 +298,7 @@ esp_err_t ADS126X::readADC(uint8_t pos_mux, uint8_t neg_mux, float* raw, uint32_
     gpio_set_level((gpio_num_t)GPIO_CS_ADC, 0);
     TRY(spiTransfer(tx, rx, sizeof(tx)));
     gpio_set_level((gpio_num_t)GPIO_CS_ADC, 1);
-    TRY(checkFrame(ADS126X_RDATA, rx));
+    //TRY(checkFrame(ADS126X_RDATA, rx));
 
     //5. Assemble the 24-bit two's complement result and sign-extend it to 32 bits
     

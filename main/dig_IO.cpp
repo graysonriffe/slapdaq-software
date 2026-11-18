@@ -11,8 +11,8 @@ esp_err_t set_all_pins_as_input(void)
     io_config.pin_bit_mask = GPIO_SEL_BITMASK;
     io_config.mode = GPIO_MODE_INPUT;
     io_config.intr_type = GPIO_INTR_DISABLE;
-    io_config.pull_up_en = GPIO_PULLUP_DISABLE;
-    io_config.pull_down_en = GPIO_PULLDOWN_ENABLE; //Configure to a pulldown resistor
+    io_config.pull_up_en = GPIO_PULLUP_ENABLE; //Configure a pullup resistor
+    io_config.pull_down_en = GPIO_PULLDOWN_DISABLE;
 
     return gpio_config(&io_config);
 

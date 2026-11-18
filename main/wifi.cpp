@@ -21,17 +21,6 @@ static void drop_client(void)
     s_rxLen = 0;
 }
 
-static void configure_client_socket(int fd)
-{
-    // send small packets instead of one large packet
-    int one = 1;
-    setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));
-
-    // check to make sure TCP send doesn't delay measurement loop
-    timeval snd_timeout = {1, 0};
-    setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &snd_timeout, sizeof(snd_timeout));
-}
-
 bool wifi_initialize(void) {
     ESP_LOGI(WIFI_TAG, "Initializing...");
 
@@ -74,7 +63,6 @@ bool wifi_initialize(void) {
     strcpy((char*)wifiConfig.ap.password, WIFI_PASSWORD);
     wifiConfig.ap.authmode = WIFI_AUTH_WPA2_PSK;
     wifiConfig.ap.max_connection = 2;
-    wifiConfig.ap.channel = 1;
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifiConfig));
@@ -120,46 +108,32 @@ bool wifi_initialize(void) {
     return true;
 }
 
-bool wifi_client_connected(int timeout_ms)
+bool wifi_wait_for_connection()
 {
     if (s_listenFD < 0) return false;
-    if (s_clientFD >= 0) timeout_ms = 0;
 
-    fd_set readSet;
-    FD_ZERO(&readSet);
-    FD_SET(s_listenFD, &readSet);
-    timeval tv = {timeout_ms / 1000, (timeout_ms % 1000) * 1000};
+    ESP_LOGI(WIFI_TAG, "Waiting for connection...");
 
-    int sel = select(s_listenFD + 1, &readSet, nullptr, nullptr, &tv);
-
-    if (sel < 0)
+    sockaddr_in clientAddress = {};
+    socklen_t len = sizeof(clientAddress);
+    int fd = accept(s_listenFD, (sockaddr*)&clientAddress, &len);
+    
+    if (fd >= 0)
     {
-        ESP_LOGE(WIFI_TAG, "select failed, errno=%d", errno);
-        return s_clientFD >= 0;
-    }
-
-    if (sel > 0)
-    {
-        sockaddr_in clientAddress = {};
-        socklen_t len = sizeof(clientAddress);
-        int fd = accept(s_listenFD, (sockaddr*)&clientAddress, &len);
+        drop_client();
         
-        if (fd >= 0)
-        {
-            if (s_clientFD >= 0)
-            {
-                ESP_LOGW(WIFI_TAG, "New connection replaces the previous client");
-            }
-            drop_client();
-            configure_client_socket(fd);
-            s_clientFD = fd;
-            ESP_LOGI(WIFI_TAG, "Got connection from %s. Sending data", inet_ntoa(clientAddress.sin_addr));
-        }
-        else
-        {
-            ESP_LOGE(WIFI_TAG, "accept failed, errno=%d", errno);
-        }
+        // Socket will timeout if it cannot send for 5 seconds
+        timeval snd_timeout = { 5, 0 };
+        setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &snd_timeout, sizeof(snd_timeout));
+
+        s_clientFD = fd;
+        ESP_LOGI(WIFI_TAG, "Got connection from %s. Sending data", inet_ntoa(clientAddress.sin_addr));
     }
+    else
+    {
+        ESP_LOGE(WIFI_TAG, "accept failed, errno=%d", errno);
+    }
+    
     return s_clientFD >= 0;
 }
 
