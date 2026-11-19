@@ -4,8 +4,8 @@
 
 #include "driver/gpio.h"
 
-#define WIFI_PASSWORD   "dummyPassword"
-#define WIFI_SSID       "Main SLAPDAQ"
+#define WIFI_PASSWORD   "password"
+#define WIFI_SSID       "SlapDAQ"
 #define WIFI_TCP_PORT   15000
 
 #define WIFI_LED_PIN    GPIO_NUM_1
@@ -22,5 +22,5 @@ bool wifi_send(const char *data, size_t len);
 // stream non-blocking receive: > 0 bytes then read, 0 nothing so wait, -1 theres no client
 int wifi_receive(uint8_t *buf, size_t len);
 
-// read function to obtain a full packet
-bool wifi_receive_packet(uint8_t *pkt, size_t len);
+// read function to obtain multiple bytes
+int wifi_receive_bytes(uint8_t *pkt, size_t len);

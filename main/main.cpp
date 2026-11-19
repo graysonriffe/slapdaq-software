@@ -65,7 +65,7 @@ static constexpr ADCChannel ADC_CHANNELS[] =
     { "AC2", ADS126X_MUXP_AIN8, ADS126X_MUXN_AINCOM, ADCChannelKind::Current }
 };
 
-static const char* LOG_TAG = "MAIN";
+static const char* TAG = "MAIN";
 
 // begin() RESETS the chips, which wipes any setting made after it.
 static bool configureAdc(ADS126X &adc)
@@ -83,38 +83,39 @@ static bool configureAdc(ADS126X &adc)
     
     if (err != ESP_OK)
     {
-        ESP_LOGE(LOG_TAG, "ADC setup failed: %s", esp_err_to_name(err));
+        ESP_LOGE(TAG, "ADC setup failed: %s", esp_err_to_name(err));
         return false;
     }
 
     return true;
 }
 
-static void handleHostCommand(const uint8_t *pkt)
+static bool listenForDIOUpdate()
 {
-    uint8_t type = 0, mask = 0;
-    if (!parseDioConfigPacket(pkt, DIO_PACKET_LEN, &type, &mask))
-    {
-        ESP_LOGW(LOG_TAG, "Ignoring unknown command packet %02X %02X", pkt[0], pkt[1]);
-        return;
+    uint8_t buffer[16] = {};
+
+    int result = wifi_receive_bytes(buffer, sizeof(buffer));
+
+    if (result < 0)
+        return false; // Disconnection
+
+    if (result == 0)
+        return true; // No DIO update
+
+    uint8_t directionMask = 0;
+    uint8_t levelMask = 0;
+
+    for (int i = 0; i < 8; i++) {
+        directionMask |= (buffer[i * 2] << i);
+        levelMask |= (buffer[i * 2 + 1] << i);
     }
 
-    esp_err_t err = ESP_OK;
-    switch (type)
-    {
-        case MSG_SET_DIO_DIR:   err = applyDioDirections(mask); break;
-        case MSG_SET_DIO_LEVEL: err = applyDioLevels(mask);     break;
-        default: break;
-    }
+    ESP_LOGI(TAG, "Got DIO Update");
 
-    if (err != ESP_OK)
-    {
-        ESP_LOGE(LOG_TAG, "DIO command 0x%02X failed: %s", type, esp_err_to_name(err));
-    }
-    else
-    {
-        ESP_LOGI(LOG_TAG, "DIO %s mask set to 0x%02X", (type == MSG_SET_DIO_DIR) ? "direction" : "level", mask);
-    }
+    applyDioDirections(directionMask);
+    applyDioLevels(levelMask);
+
+    return true;
 }
 
 // measure one ADC channel and convert it to its respective units
@@ -137,6 +138,8 @@ extern "C" void app_main(void)
     /*                    INITIALIZATION                      */
     /******************************************************** */
 
+    ESP_LOGI(TAG, "SlapDAQ initializing...");
+
     esp_err_t ret;
 
     /*Initialize SPI*/
@@ -144,84 +147,74 @@ extern "C" void app_main(void)
 
     if (ret != ESP_OK)
     {
-        ESP_LOGE(LOG_TAG, "SPI_Init failed: %s", esp_err_to_name(ret));
+        ESP_LOGE(TAG, "SPI_Init failed: %s", esp_err_to_name(ret));
         return;
     }
 
-    ESP_LOGI(LOG_TAG, "SPI has been initialized");
+    ESP_LOGI(TAG, "SPI initialized");
 
     /*Set GPIOs to inputs*/
     ret = set_all_pins_as_input();
 
     if (ret != ESP_OK)
     {
-        ESP_LOGE(LOG_TAG, "GPIO init failed: %s", esp_err_to_name(ret));
+        ESP_LOGE(TAG, "GPIO init failed: %s", esp_err_to_name(ret));
         return;
     }
 
-    ESP_LOGI(LOG_TAG, "GPIO has been initialized");
+    ESP_LOGI(TAG, "GPIO initialized");
 
-    //Initialize wifi
+    // Initialize Wi-Fi
     if (!wifi_initialize())
     {
-       ESP_LOGE(LOG_TAG, "Wifi could not be initialized");
+       ESP_LOGE(TAG, "Wifi could not be initialized");
        return;
     }
 
-    /*ADC instantiation*/
+    ESP_LOGI(TAG, "Wi-Fi initialized");
+
+    // Initialize ADC
     ADS126X adc;
 
     bool adc_ok = configureAdc(adc);
     if (!adc_ok)
     {
-        ESP_LOGE(LOG_TAG, "configureAdc() failed");
+        ESP_LOGE(TAG, "configureAdc() failed");
         return;
     }
 
-    /*Thermocouple instantiation*/
+    ESP_LOGI(TAG, "ADC initialized");
+
+    // Initialize thermocouple
     SlapDAQ_MAX31856 thermo;
 
-    //initialize thermocouple
     bool thermo_ok = thermo.thermoInit();
     if (!thermo_ok)
     {
-        ESP_LOGE(LOG_TAG, "Thermocouple init failed");
+        ESP_LOGE(TAG, "Thermocouple init failed");
         return;
     }
 
+    ESP_LOGI(TAG, "Thermocouple initialized");
+
     /******************************************************** */
-    /*                MAIN LOOP                               */
+    /*                     MAIN LOOP                          */
     /******************************************************** */
 
     while (true) {
         wifi_wait_for_connection();
 
-        uint32_t loop_count = 0;
         TickType_t lastWake = xTaskGetTickCount();
 
         while (true)
         {
-            int64_t startTime = esp_timer_get_time();
-
-            // if (connected != was_connected)
-            // {
-            //     ESP_LOGI(LOG_TAG, "Client %s", connected ? "connected" : "disconnected");
-            //     was_connected = connected;
-            // }
-
-            // update digital IO from user
-            // uint8_t pkt[DIO_PACKET_LEN];
-            // while (wifi_receive_packet(pkt, sizeof(pkt)))
-            // {
-            //     handleHostCommand(pkt);
-            // }
-
-            // Handle disconnect here when trying to receive
+            // Check for a DIO update
+            if (!listenForDIOUpdate())
+                break;
 
             /*------------- ADC -----------*/
             // scan every channel in the table with their respective mux pair
-            float adc_value[ADC_NUM_CHANNELS];
-            for (size_t ch = 0; ch < ADC_NUM_CHANNELS; ch++) adc_value[ch] = NAN;   // NaN = no reading
+            float adc_value[ADC_NUM_CHANNELS] = {};
 
             for (size_t ch = 0; ch < ADC_NUM_CHANNELS; ch++)
             {
@@ -229,7 +222,7 @@ extern "C" void app_main(void)
                 if (ret != ESP_OK)
                 {
                     // failure here is either the spi link or the chip
-                    ESP_LOGE(LOG_TAG, "reading %s failed: %s - will re-intialize the ADC",
+                    ESP_LOGE(TAG, "reading %s failed: %s - will re-intialize the ADC",
                                 ADC_CHANNELS[ch].name, esp_err_to_name(ret));
                     for (size_t index = 0; index < ADC_NUM_CHANNELS; index++) adc_value[index] = NAN;
                     adc_ok = false;
@@ -237,35 +230,15 @@ extern "C" void app_main(void)
                 }
             }
             
-            // two summary lines per loop: DIO + thermocouple, then every ADC measurement
-            // ESP_LOGI(LOG_TAG, "DIO 0x%02X | TC %.2f C", digital_bits, (double) temp_c);
-
-
-            // char adc_line[256];
-            // int pos = 0;
-            // for (size_t ch = 0; ch < ADC_NUM_CHANNELS; ch++)
-            // {
-            //     const ADCChannel &c = ADC_CHANNELS[ch];
-            //     const bool is_current = (c.kind == ADCChannelKind::Current);
-            //     const float v = adc_value[ch];
-
-            //     int n = snprintf(adc_line + pos, sizeof(adc_line) - pos, "%s %s %.4f %s",
-            //                      (ch == 0) ? "" : " |", c.name, (double) v, is_current ? "mA" : "V");
-            //     if (n < 0 || pos + n >= (int) sizeof(adc_line)) break;
-            //     pos += n;
-            // }
-            // ESP_LOGI(LOG_TAG, "ADC%s%s", adc_line, adc_ok ? "" : " [ADC offline]");
-
-            /*------------- thermocouple -----------*/
-            float temp_c = NAN;
-            temp_c = thermo.readThermocoupleTemperature();
+            /*------------- Thermocouple -----------*/
+            float temp_c = thermo.readThermocoupleTemperature();
 
             /*----------------- DIO ----------------*/
             uint8_t digital_bits = read_all_pins();
 
-            /*------------- send measurements to PC -----------*/
-            //measurements.digitalIOData = digital_bits;
+            /*------- Send measurements to PC ------*/
             Sample sample = {};
+
             for (size_t ch = 0; ch < ADC_NUM_CHANNELS; ch++)
                 sample.adcData[ch] = adc_value[ch];
             
@@ -279,13 +252,6 @@ extern "C" void app_main(void)
                 break;
 
             xTaskDelayUntil(&lastWake, LOOP_PERIOD);
-
-            loop_count++;
-
-            int64_t loopDuration = esp_timer_get_time() - startTime;
-
-            if (loop_count % 100 == 0)
-                ESP_LOGI(LOG_TAG, "Elapsed time: %lld", loopDuration);
         }
     }
 }

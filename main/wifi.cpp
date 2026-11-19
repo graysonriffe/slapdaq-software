@@ -19,6 +19,8 @@ static size_t s_rxLen = 0;
 // close the current client (if any)
 static void drop_client(void)
 {
+    gpio_set_level(WIFI_LED_PIN, 0); // Turn Wi-Fi LED off
+
     if (s_clientFD >= 0)
     {
         close(s_clientFD);
@@ -115,6 +117,7 @@ bool wifi_initialize(void) {
     // Initialize Wi-Fi LED
     gpio_reset_pin(WIFI_LED_PIN);
     gpio_set_direction(WIFI_LED_PIN, GPIO_MODE_OUTPUT);
+    gpio_set_level(WIFI_LED_PIN, 0);
 
     return true;
 }
@@ -124,8 +127,6 @@ bool wifi_wait_for_connection()
     if (s_listenFD < 0) return false;
 
     ESP_LOGI(WIFI_TAG, "Waiting for connection...");
-
-    gpio_set_level(WIFI_LED_PIN, 0);
 
     sockaddr_in clientAddress = {};
     socklen_t len = sizeof(clientAddress);
@@ -194,18 +195,19 @@ int wifi_receive(uint8_t *buf, size_t len)
     return -1;
 }
 
-bool wifi_receive_packet(uint8_t *pkt, size_t len)
+int wifi_receive_bytes(uint8_t *pkt, size_t len)
 {
     if (pkt == nullptr || len == 0 || len > sizeof(s_rxBuf)) return false;
 
     while (s_rxLen < len)
     {
         int n = wifi_receive(s_rxBuf + s_rxLen, len - s_rxLen);
-        if (n <= 0) return false;
+        if (n < 0) return -1;
+        if (n == 0) return 0;
         s_rxLen += (size_t) n;
     }
 
     memcpy(pkt, s_rxBuf, len);
     s_rxLen = 0;
-    return true;
+    return len;
 }
